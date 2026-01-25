@@ -533,10 +533,31 @@ export class Player extends Entity {
                 // Landing on ground - check for fall damage
                 if (this.wasFalling && !this.isInWater) {
                     const fallDistance = this.fallStartZ - this.z;
+                    
+                    // Play landing sound based on distance
+                    if (fallDistance >= 2) {
+                        this.game.audio?.play('hit'); // Hard landing
+                        // Small camera shake for any significant landing
+                        this.game.camera?.addShake(Math.min(fallDistance * 0.3, 3), 0.15);
+                        
+                        // Add dust particles
+                        this.game.particles?.emit(this.x, this.y, this.z, '#8B7355', 5);
+                    }
+                    
                     if (fallDistance >= CONFIG.FALL_DAMAGE_MIN_HEIGHT) {
                         const damage = Math.floor((fallDistance - CONFIG.FALL_DAMAGE_MIN_HEIGHT + 1) * CONFIG.FALL_DAMAGE_MULTIPLIER);
                         this.takeDamage(damage, null, 'fall');
-                        this.game.camera.addShake(damage * 0.5, 0.2);
+                        
+                        // More intense camera shake for damage
+                        this.game.camera?.addShake(damage * 0.8, 0.3);
+                        
+                        // Red flash effect
+                        if (this.game.renderer3d) {
+                            this.game.renderer3d.flashDamage();
+                        }
+                        
+                        // Play hurt sound
+                        this.game.audio?.play('hurt');
                     }
                 }
                 this.wasFalling = false;

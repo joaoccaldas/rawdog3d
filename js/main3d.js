@@ -93,7 +93,15 @@ class Game3D {
         
         this.fps = 0;
         this.entities = [];
-        this.mining = { currentBlock: null, progress: 0, maxProgress: 0 };
+        this.mining = { 
+            currentBlock: null, 
+            progress: 0, 
+            maxProgress: 0,
+            x: null,
+            y: null,
+            z: null,
+            blockId: null
+        };
         
         // Dirty chunks queue for mesh rebuilding
         this.dirtyChunks = new Set();
@@ -884,7 +892,8 @@ class Game3D {
     tryMine3D() {
         const hit = this.camera3d.getTargetBlock(5);
         if (!hit) {
-            console.log('tryMine3D: No target block found');
+            // Reset mining progress if no target
+            this.resetMiningProgress();
             return false;
         }
         
@@ -892,37 +901,105 @@ class Game3D {
         const blockData = BLOCK_DATA[blockId];
         
         if (!blockData || blockId === BLOCKS.BEDROCK) {
-            console.log('tryMine3D: Invalid block or bedrock');
+            this.resetMiningProgress();
             return false;
         }
         
-        console.log('Mining block:', blockId, 'at', x, y, z);
-        
-        // Mining logic (simplified for now)
-        const tool = this.player.getSelectedItem();
-        const miningSpeed = tool?.miningSpeed || 1;
-        
-        // Add break particles
-        this.renderer3d.addBlockBreakParticles(x, y, z, blockId);
-        
-        // Instant mine for testing (can add progress later)
-        this.world.setBlock(x, y, z, BLOCKS.AIR);
-        this.markChunkDirty(x, y);
-        
-        // Drop item
-        const drops = blockData.drops || [blockId];
-        for (const dropId of drops) {
-            // Find item key for this block
-            for (const [key, item] of Object.entries(ITEMS)) {
-                if (item.blockId === dropId || item.blockId === blockId) {
-                    this.player.addItem(key);
-                    break;
+        // Check if we're mining a different block
+        if (this.mining.x !== x || this.mining.y !== y || this.mining.z !== z) {
+            // Start mining new block
+            this.mining.x = x;
+            this.mining.y = y;
+            this.mining.z = z;
+            this.mining.blockId = blockId;
+            this.mining.progress = 0;
+            
+            // Calculate mining time based on hardness and tool
+            const tool = this.player.getSelectedItem();
+            const baseHardness = blockData.hardness || 1;
+            let miningSpeed = 1;
+            
+            // Tool effectiveness
+            if (tool) {
+                miningSpeed = tool.miningSpeed || 1;
+                
+                // Bonus for correct tool type
+                if (blockData.toolRequired === tool.toolType || 
+                    blockData.toolPreferred === tool.toolType) {
+                    miningSpeed *= 2;
                 }
             }
+            
+            // Mining time in seconds
+            this.mining.maxProgress = baseHardness / miningSpeed;
         }
         
-        this.audio.play('break');
-        return true;
+        // Increment mining progress
+        const deltaTime = 1/60; // Approximate frame time
+        this.mining.progress += deltaTime;
+        
+        // Update mining overlay
+        const progressRatio = this.mining.progress / this.mining.maxProgress;
+        this.renderer3d.updateMiningOverlay(x, y, z, progressRatio);
+        
+        // Play mining sound periodically
+        if (Math.floor(this.mining.progress * 4) !== Math.floor((this.mining.progress - deltaTime) * 4)) {
+            this.audio.play('hit');
+        }
+        
+        // Check if mining complete
+        if (this.mining.progress >= this.mining.maxProgress) {
+            // Block broken!
+            console.log('Block broken:', blockId, 'at', x, y, z);
+            
+            // Add break particles
+            this.renderer3d.addBlockBreakParticles(x, y, z, blockId);
+            
+            // Remove torch light if it was a light source
+            if (blockId === BLOCKS.TORCH || blockId === BLOCKS.CAMPFIRE) {
+                this.renderer3d.removeTorchLight(x, y, z);
+            }
+            
+            // Remove block
+            this.world.setBlock(x, y, z, BLOCKS.AIR);
+            this.markChunkDirty(x, y);
+            
+            // Drop item
+            const drops = blockData.drops;
+            if (drops) {
+                if (typeof drops === 'string') {
+                    this.player.addItem(drops);
+                } else if (Array.isArray(drops)) {
+                    for (const dropId of drops) {
+                        this.player.addItem(dropId);
+                    }
+                }
+            } else {
+                // Find item key for this block
+                for (const [key, item] of Object.entries(ITEMS)) {
+                    if (item.blockId === blockId) {
+                        this.player.addItem(key);
+                        break;
+                    }
+                }
+            }
+            
+            this.audio.play('break');
+            this.resetMiningProgress();
+            return true;
+        }
+        
+        return false;
+    }
+    
+    resetMiningProgress() {
+        this.mining.x = null;
+        this.mining.y = null;
+        this.mining.z = null;
+        this.mining.blockId = null;
+        this.mining.progress = 0;
+        this.mining.maxProgress = 0;
+        this.renderer3d?.updateMiningOverlay(null, null, null, 0);
     }
     
     tryPlace3D() {
@@ -956,6 +1033,12 @@ class Game3D {
         
         this.world.setBlock(px, py, pz, blockId);
         this.markChunkDirty(px, py);
+        
+        // Add torch light for light-emitting blocks
+        if (blockId === BLOCKS.TORCH || blockId === BLOCKS.CAMPFIRE || 
+            blockId === BLOCKS.LAVA || blockId === BLOCKS.GLOWSTONE) {
+            this.renderer3d.addTorchLight(px, py, pz);
+        }
         
         // Consume item (unless builder mode)
         if (!this.builderMode) {

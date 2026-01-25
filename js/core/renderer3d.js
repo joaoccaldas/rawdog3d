@@ -49,6 +49,17 @@ export class Renderer3D {
         this.selectionBox = null;
         this.placementPreview = null;
         
+        // Mining crack overlay
+        this.miningOverlay = null;
+        this.miningProgress = 0;
+        this.miningTarget = null;
+        
+        // Point lights for torches
+        this.torchLights = new Map();
+        
+        // Held item display
+        this.heldItemMesh = null;
+        
         // Sky and environment
         this.skybox = null;
         this.ambientLight = null;
@@ -90,6 +101,8 @@ export class Renderer3D {
         // Selection highlight cube
         this.createSelectionBox();
         this.createPlacementPreview();
+        this.createMiningOverlay();
+        this.createHeldItemDisplay();
         
         // Create player model
         this.createPlayerModel();
@@ -270,18 +283,216 @@ export class Renderer3D {
     }
     
     createPlacementPreview() {
-        const geometry = new THREE.BoxGeometry(1, 1, 1);
+        const geometry = new THREE.BoxGeometry(1.02, 1.02, 1.02); // Slightly larger to avoid z-fighting
         const material = new THREE.MeshBasicMaterial({
             color: 0x00ff00,
             transparent: true,
-            opacity: 0.3,
-            side: THREE.DoubleSide
+            opacity: 0.35,
+            side: THREE.DoubleSide,
+            depthWrite: false
         });
         this.placementPreview = new THREE.Mesh(geometry, material);
         this.placementPreview.visible = false;
+        this.placementPreview.renderOrder = 100; // Render after terrain
         this.scene.add(this.placementPreview);
+        
+        // Create wireframe outline for extra visibility
+        const wireGeo = new THREE.BoxGeometry(1.02, 1.02, 1.02);
+        const edges = new THREE.EdgesGeometry(wireGeo);
+        const wireMat = new THREE.LineBasicMaterial({ 
+            color: 0xffffff, 
+            transparent: true, 
+            opacity: 0.8 
+        });
+        this.placementWireframe = new THREE.LineSegments(edges, wireMat);
+        this.placementWireframe.visible = false;
+        this.placementWireframe.renderOrder = 101;
+        this.scene.add(this.placementWireframe);
     }
     
+    createMiningOverlay() {
+        // Create mining crack overlay texture
+        const canvas = document.createElement('canvas');
+        canvas.width = 16;
+        canvas.height = 16;
+        const ctx = canvas.getContext('2d');
+        
+        // Create crack patterns for different stages
+        this.crackTextures = [];
+        for (let stage = 0; stage < 10; stage++) {
+            const stageCanvas = document.createElement('canvas');
+            stageCanvas.width = 16;
+            stageCanvas.height = 16;
+            const stageCtx = stageCanvas.getContext('2d');
+            
+            // Draw cracks based on stage
+            stageCtx.fillStyle = 'rgba(0,0,0,0)';
+            stageCtx.fillRect(0, 0, 16, 16);
+            
+            const intensity = (stage + 1) / 10;
+            const numCracks = Math.floor(3 + stage * 2);
+            
+            stageCtx.strokeStyle = `rgba(0,0,0,${0.3 + intensity * 0.5})`;
+            stageCtx.lineWidth = 1;
+            
+            for (let i = 0; i < numCracks; i++) {
+                const x1 = Math.random() * 16;
+                const y1 = Math.random() * 16;
+                const x2 = x1 + (Math.random() - 0.5) * 10;
+                const y2 = y1 + (Math.random() - 0.5) * 10;
+                
+                stageCtx.beginPath();
+                stageCtx.moveTo(x1, y1);
+                stageCtx.lineTo(x2, y2);
+                stageCtx.stroke();
+            }
+            
+            const texture = new THREE.CanvasTexture(stageCanvas);
+            texture.magFilter = THREE.NearestFilter;
+            texture.minFilter = THREE.NearestFilter;
+            this.crackTextures.push(texture);
+        }
+        
+        // Create overlay mesh
+        const geometry = new THREE.BoxGeometry(1.005, 1.005, 1.005);
+        const material = new THREE.MeshBasicMaterial({
+            map: this.crackTextures[0],
+            transparent: true,
+            opacity: 0.8,
+            depthWrite: false,
+            side: THREE.FrontSide
+        });
+        this.miningOverlay = new THREE.Mesh(geometry, material);
+        this.miningOverlay.visible = false;
+        this.miningOverlay.renderOrder = 1;
+        this.scene.add(this.miningOverlay);
+    }
+    
+    updateMiningOverlay(x, y, z, progress) {
+        if (x !== null && progress > 0) {
+            this.miningOverlay.position.set(x + 0.5, z + 0.5, y + 0.5);
+            this.miningOverlay.visible = true;
+            
+            // Update crack texture based on progress (0-1)
+            const stage = Math.min(9, Math.floor(progress * 10));
+            this.miningOverlay.material.map = this.crackTextures[stage];
+            this.miningOverlay.material.needsUpdate = true;
+        } else {
+            this.miningOverlay.visible = false;
+        }
+    }
+    
+    createHeldItemDisplay() {
+        // Create a group for the held item (will be positioned relative to camera)
+        this.heldItemGroup = new THREE.Group();
+        
+        // Create a simple block mesh for held item
+        const geometry = new THREE.BoxGeometry(0.4, 0.4, 0.4);
+        const material = new THREE.MeshLambertMaterial({ color: 0x8B5A2B });
+        this.heldItemMesh = new THREE.Mesh(geometry, material);
+        this.heldItemMesh.visible = false;
+        this.heldItemGroup.add(this.heldItemMesh);
+    }
+    
+    updateHeldItem(item, camera) {
+        if (!item || !this.heldItemMesh) return;
+        
+        // Position held item in lower right of screen (first-person style)
+        // This would need camera attachment for proper FPS view
+        // For third-person, we update the player's held item
+        if (this.playerMesh && this.playerMesh.userData.rightArm) {
+            // Show item in player's hand during third-person
+            // Item color based on type
+            const color = item.blockId ? 
+                (BLOCK_DATA[item.blockId]?.color || '#8B5A2B') : 
+                '#C0C0C0';
+            this.heldItemMesh.material.color.set(color);
+            this.heldItemMesh.visible = true;
+        }
+    }
+    
+    // Add/remove torch point lights
+    addTorchLight(x, y, z) {
+        const key = `${x},${y},${z}`;
+        if (this.torchLights.has(key)) return;
+        
+        const light = new THREE.PointLight(0xFFAA44, 1, 10);
+        light.position.set(x + 0.5, z + 0.5, y + 0.5);
+        this.scene.add(light);
+        this.torchLights.set(key, light);
+    }
+    
+    removeTorchLight(x, y, z) {
+        const key = `${x},${y},${z}`;
+        const light = this.torchLights.get(key);
+        if (light) {
+            this.scene.remove(light);
+            this.torchLights.delete(key);
+        }
+    }
+    
+    // Update sky color based on time of day
+    updateSkyColor(timeOfDay) {
+        // timeOfDay: 0-1 where 0.5 is noon
+        const dayColor = new THREE.Color(0x87CEEB); // Sky blue
+        const sunsetColor = new THREE.Color(0xFF7F50); // Coral
+        const nightColor = new THREE.Color(0x191970); // Midnight blue
+        
+        let skyColor;
+        let sunIntensity;
+        let ambientIntensity;
+        
+        if (timeOfDay < 0.2) {
+            // Night to dawn
+            const t = timeOfDay / 0.2;
+            skyColor = nightColor.clone().lerp(sunsetColor, t);
+            sunIntensity = 0.1 + t * 0.3;
+            ambientIntensity = 0.1 + t * 0.2;
+        } else if (timeOfDay < 0.3) {
+            // Dawn to day
+            const t = (timeOfDay - 0.2) / 0.1;
+            skyColor = sunsetColor.clone().lerp(dayColor, t);
+            sunIntensity = 0.4 + t * 0.4;
+            ambientIntensity = 0.3 + t * 0.1;
+        } else if (timeOfDay < 0.7) {
+            // Day
+            skyColor = dayColor;
+            sunIntensity = 0.8;
+            ambientIntensity = 0.4;
+        } else if (timeOfDay < 0.8) {
+            // Day to dusk
+            const t = (timeOfDay - 0.7) / 0.1;
+            skyColor = dayColor.clone().lerp(sunsetColor, t);
+            sunIntensity = 0.8 - t * 0.4;
+            ambientIntensity = 0.4 - t * 0.1;
+        } else {
+            // Dusk to night
+            const t = (timeOfDay - 0.8) / 0.2;
+            skyColor = sunsetColor.clone().lerp(nightColor, t);
+            sunIntensity = 0.4 - t * 0.3;
+            ambientIntensity = 0.3 - t * 0.2;
+        }
+        
+        // Apply colors
+        this.renderer.setClearColor(skyColor);
+        this.scene.fog.color = skyColor;
+        
+        if (this.sunLight) {
+            this.sunLight.intensity = sunIntensity;
+            // Move sun position based on time
+            const sunAngle = (timeOfDay - 0.25) * Math.PI * 2;
+            this.sunLight.position.set(
+                Math.cos(sunAngle) * 100,
+                Math.sin(sunAngle) * 100 + 50,
+                50
+            );
+        }
+        
+        if (this.ambientLight) {
+            this.ambientLight.intensity = ambientIntensity;
+        }
+    }
+
     createPlayerModel() {
         // Create a simple humanoid model for the player
         const group = new THREE.Group();
@@ -393,12 +604,40 @@ export class Renderer3D {
             this.placementPreview.position.set(x + 0.5, z + 0.5, y + 0.5);
             this.placementPreview.visible = true;
             
+            // Update wireframe position
+            if (this.placementWireframe) {
+                this.placementWireframe.position.set(x + 0.5, z + 0.5, y + 0.5);
+                this.placementWireframe.visible = true;
+            }
+            
             // Color based on whether placement is valid
             const blockAtPos = this.game.world.getBlock(x, y, z);
             const isValid = blockAtPos === BLOCKS.AIR;
-            this.placementPreview.material.color.set(isValid ? 0x00ff00 : 0xff0000);
+            
+            // Get block color for preview tinting
+            const blockData = BLOCK_DATA[blockId];
+            if (blockData && blockData.color) {
+                const baseColor = new THREE.Color(blockData.color);
+                // Mix with green/red validity indicator
+                if (isValid) {
+                    baseColor.lerp(new THREE.Color(0x00ff00), 0.5);
+                } else {
+                    baseColor.lerp(new THREE.Color(0xff0000), 0.5);
+                }
+                this.placementPreview.material.color.copy(baseColor);
+            } else {
+                this.placementPreview.material.color.set(isValid ? 0x00ff00 : 0xff0000);
+            }
+            
+            // Wireframe color
+            if (this.placementWireframe) {
+                this.placementWireframe.material.color.set(isValid ? 0xffffff : 0xff8888);
+            }
         } else {
             this.placementPreview.visible = false;
+            if (this.placementWireframe) {
+                this.placementWireframe.visible = false;
+            }
         }
     }
     
@@ -751,32 +990,68 @@ export class Renderer3D {
             top: {    // Face at Z=1 (top of block), normal points up (+Z)
                 verts: [[0,0,1], [1,0,1], [1,1,1], [0,1,1]],
                 normal: [0, 0, 1],  // World +Z (up)
-                uvCoords: [[0,0], [1,0], [1,1], [0,1]]
+                uvCoords: [[0,0], [1,0], [1,1], [0,1]],
+                aoNeighbors: [
+                    [[-1,0,0], [-1,-1,0], [0,-1,0]], // Corner 0
+                    [[1,0,0], [1,-1,0], [0,-1,0]],   // Corner 1
+                    [[1,0,0], [1,1,0], [0,1,0]],     // Corner 2
+                    [[-1,0,0], [-1,1,0], [0,1,0]]    // Corner 3
+                ]
             },
             bottom: { // Face at Z=0 (bottom of block), normal points down (-Z)
                 verts: [[0,1,0], [1,1,0], [1,0,0], [0,0,0]],
                 normal: [0, 0, -1], // World -Z (down)
-                uvCoords: [[0,0], [1,0], [1,1], [0,1]]
+                uvCoords: [[0,0], [1,0], [1,1], [0,1]],
+                aoNeighbors: [
+                    [[-1,1,0], [-1,0,0], [0,1,0]],
+                    [[1,1,0], [1,0,0], [0,1,0]],
+                    [[1,-1,0], [1,0,0], [0,-1,0]],
+                    [[-1,-1,0], [-1,0,0], [0,-1,0]]
+                ]
             },
             front: {  // Face at Y=0 (front of block), normal points backward (-Y)
                 verts: [[0,0,0], [0,0,1], [1,0,1], [1,0,0]],
                 normal: [0, -1, 0], // World -Y (toward camera/back)
-                uvCoords: [[0,0], [0,1], [1,1], [1,0]]
+                uvCoords: [[0,0], [0,1], [1,1], [1,0]],
+                aoNeighbors: [
+                    [[-1,0,0], [-1,0,-1], [0,0,-1]],
+                    [[-1,0,0], [-1,0,1], [0,0,1]],
+                    [[1,0,0], [1,0,1], [0,0,1]],
+                    [[1,0,0], [1,0,-1], [0,0,-1]]
+                ]
             },
             back: {   // Face at Y=1 (back of block), normal points forward (+Y)
                 verts: [[1,1,0], [1,1,1], [0,1,1], [0,1,0]],
                 normal: [0, 1, 0],  // World +Y (forward)
-                uvCoords: [[0,0], [0,1], [1,1], [1,0]]
+                uvCoords: [[0,0], [0,1], [1,1], [1,0]],
+                aoNeighbors: [
+                    [[1,0,0], [1,0,-1], [0,0,-1]],
+                    [[1,0,0], [1,0,1], [0,0,1]],
+                    [[-1,0,0], [-1,0,1], [0,0,1]],
+                    [[-1,0,0], [-1,0,-1], [0,0,-1]]
+                ]
             },
             right: {  // Face at X=1 (right of block), normal points right (+X)
                 verts: [[1,0,0], [1,0,1], [1,1,1], [1,1,0]],
                 normal: [1, 0, 0],  // World +X (right)
-                uvCoords: [[0,0], [0,1], [1,1], [1,0]]
+                uvCoords: [[0,0], [0,1], [1,1], [1,0]],
+                aoNeighbors: [
+                    [[0,-1,0], [0,-1,-1], [0,0,-1]],
+                    [[0,-1,0], [0,-1,1], [0,0,1]],
+                    [[0,1,0], [0,1,1], [0,0,1]],
+                    [[0,1,0], [0,1,-1], [0,0,-1]]
+                ]
             },
             left: {   // Face at X=0 (left of block), normal points left (-X)
                 verts: [[0,1,0], [0,1,1], [0,0,1], [0,0,0]],
                 normal: [-1, 0, 0], // World -X (left)
-                uvCoords: [[0,0], [0,1], [1,1], [1,0]]
+                uvCoords: [[0,0], [0,1], [1,1], [1,0]],
+                aoNeighbors: [
+                    [[0,1,0], [0,1,-1], [0,0,-1]],
+                    [[0,1,0], [0,1,1], [0,0,1]],
+                    [[0,-1,0], [0,-1,1], [0,0,1]],
+                    [[0,-1,0], [0,-1,-1], [0,0,-1]]
+                ]
             }
         };
         
@@ -786,6 +1061,14 @@ export class Renderer3D {
         // Get UV coordinates from atlas
         const texFace = (face === 'top' || face === 'bottom') ? face : 'side';
         const atlasUV = this.getBlockUVs(blockId, texFace);
+        
+        // Calculate ambient occlusion for each vertex
+        const aoValues = [];
+        for (let i = 0; i < 4; i++) {
+            const neighbors = data.aoNeighbors[i];
+            const ao = this.calculateVertexAO(x, y, z, face, neighbors);
+            aoValues.push(ao);
+        }
         
         for (let i = 0; i < data.verts.length; i++) {
             const [vx, vy, vz] = data.verts[i];
@@ -822,6 +1105,10 @@ export class Renderer3D {
             else if (face === 'front' || face === 'right') shade = 0.8;
             else shade = 0.7;
             
+            // Apply ambient occlusion
+            const ao = aoValues[i];
+            shade *= ao;
+            
             colors.push(r * shade, g * shade, b * shade);
         }
         
@@ -829,6 +1116,57 @@ export class Renderer3D {
             startIndex, startIndex + 1, startIndex + 2,
             startIndex, startIndex + 2, startIndex + 3
         );
+    }
+    
+    /**
+     * Calculate ambient occlusion value for a vertex
+     * Based on Minecraft's algorithm: check 3 neighbors (2 edges + 1 corner)
+     * Returns value from 0.4 (fully occluded) to 1.0 (no occlusion)
+     */
+    calculateVertexAO(blockX, blockY, blockZ, face, neighbors) {
+        // Neighbors are relative offsets for the 3 blocks to check
+        // [edge1, corner, edge2]
+        const [e1, corner, e2] = neighbors;
+        
+        // Get the actual position to check based on face direction
+        let dx = 0, dy = 0, dz = 0;
+        if (face === 'top') dz = 1;
+        else if (face === 'bottom') dz = -1;
+        else if (face === 'front') dy = -1;
+        else if (face === 'back') dy = 1;
+        else if (face === 'right') dx = 1;
+        else if (face === 'left') dx = -1;
+        
+        // Check the blocks in the AO neighborhood
+        const isOccluder = (ox, oy, oz) => {
+            const bx = blockX + dx + ox;
+            const by = blockY + dy + oy;
+            const bz = blockZ + dz + oz;
+            
+            if (bz < 0 || bz >= CONFIG.WORLD_HEIGHT) return false;
+            
+            const block = this.game.world.getBlock(bx, by, bz);
+            if (block === BLOCKS.AIR) return false;
+            
+            const data = BLOCK_DATA[block];
+            return data && !data.transparent;
+        };
+        
+        const side1 = isOccluder(e1[0], e1[1], e1[2]) ? 1 : 0;
+        const side2 = isOccluder(e2[0], e2[1], e2[2]) ? 1 : 0;
+        const cornerOccluded = isOccluder(corner[0], corner[1], corner[2]) ? 1 : 0;
+        
+        // Minecraft AO formula
+        let aoLevel;
+        if (side1 && side2) {
+            aoLevel = 0; // Both sides blocked = corner fully occluded
+        } else {
+            aoLevel = 3 - (side1 + side2 + cornerOccluded);
+        }
+        
+        // Convert to brightness (0.4 to 1.0 range for visible difference)
+        const aoValues = [0.4, 0.6, 0.8, 1.0];
+        return aoValues[aoLevel];
     }
     
     /**
@@ -1009,6 +1347,49 @@ export class Renderer3D {
     }
     
     /**
+     * Flash red damage effect on screen
+     */
+    flashDamage() {
+        if (!this.damageOverlay) {
+            // Create full-screen damage overlay
+            const overlayGeo = new THREE.PlaneGeometry(2, 2);
+            const overlayMat = new THREE.MeshBasicMaterial({
+                color: 0xff0000,
+                transparent: true,
+                opacity: 0,
+                depthTest: false,
+                depthWrite: false
+            });
+            this.damageOverlay = new THREE.Mesh(overlayGeo, overlayMat);
+            this.damageOverlay.renderOrder = 9999;
+            this.damageOverlay.frustumCulled = false;
+        }
+        
+        // Trigger the flash
+        this.damageFlashTime = 0.3; // Duration of flash
+        this.damageFlashTimer = 0;
+    }
+    
+    /**
+     * Update damage flash effect
+     */
+    updateDamageFlash(deltaTime) {
+        if (this.damageFlashTime > 0 && this.damageOverlay) {
+            this.damageFlashTimer += deltaTime;
+            const progress = this.damageFlashTimer / this.damageFlashTime;
+            
+            if (progress < 1) {
+                // Fade out
+                const alpha = (1 - progress) * 0.4;
+                this.damageOverlay.material.opacity = alpha;
+            } else {
+                this.damageOverlay.material.opacity = 0;
+                this.damageFlashTime = 0;
+            }
+        }
+    }
+    
+    /**
      * Update lighting based on time of day
      */
     updateDayNightCycle(timeOfDay) {
@@ -1071,6 +1452,9 @@ export class Renderer3D {
         
         // Update damage numbers
         this.updateDamageNumbers(deltaTime);
+        
+        // Update damage flash effect
+        this.updateDamageFlash(deltaTime);
         
         this.renderer.render(this.scene, camera3d.camera);
     }

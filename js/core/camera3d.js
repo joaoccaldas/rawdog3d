@@ -18,10 +18,25 @@ export class Camera3D {
             500 // Far plane
         );
         
+        // FOV settings for sprint effect
+        this.baseFOV = 70;
+        this.sprintFOV = 85;
+        this.currentFOV = this.baseFOV;
+        this.targetFOV = this.baseFOV;
+        this.fovSmoothSpeed = 5;
+        
         // Camera control settings
         this.distance = 15; // Distance from player
-        this.minDistance = 5;
+        this.minDistance = 0; // Allow first-person (0 distance)
         this.maxDistance = 50;
+        
+        // View mode: 0 = third-person, 1 = first-person, 2 = front-facing
+        this.viewMode = 0;
+        this.viewModes = [
+            { name: 'Third Person', distance: 15 },
+            { name: 'First Person', distance: 0 },
+            { name: 'Front Facing', distance: 15, facingFront: true }
+        ];
         
         this.pitch = -0.5; // Vertical angle (radians, negative = looking down)
         this.yaw = 0; // Horizontal angle (radians)
@@ -48,6 +63,36 @@ export class Camera3D {
         
         // Initialize
         this.init();
+    }
+    
+    /**
+     * Toggle between view modes (F5 key)
+     */
+    toggleViewMode() {
+        this.viewMode = (this.viewMode + 1) % this.viewModes.length;
+        const mode = this.viewModes[this.viewMode];
+        this.distance = mode.distance;
+        
+        // Show notification
+        if (this.game.ui) {
+            this.game.ui.showNotification(mode.name);
+        }
+        
+        console.log('Camera view mode:', mode.name);
+    }
+    
+    /**
+     * Check if camera is in first-person mode
+     */
+    isFirstPerson() {
+        return this.viewMode === 1 || this.distance < 1;
+    }
+    
+    /**
+     * Check if camera is in front-facing mode
+     */
+    isFrontFacing() {
+        return this.viewMode === 2 && this.viewModes[2].facingFront;
     }
     
     init() {
@@ -179,15 +224,25 @@ export class Camera3D {
         // Target position (player position in Three.js coords)
         // World: X=right, Y=forward, Z=up
         // Three: X=right, Y=up, Z=forward
-        this.targetPosition.set(player.x, player.z + 1, player.y);
+        const eyeHeight = this.isFirstPerson() ? 1.6 : 1; // Higher eye level in first person
+        this.targetPosition.set(player.x, player.z + eyeHeight, player.y);
         
-        // Smooth follow
-        this.currentPosition.lerp(this.targetPosition, this.smoothSpeed * deltaTime);
+        // Smooth follow (faster in first person for responsiveness)
+        const followSpeed = this.isFirstPerson() ? 20 : this.smoothSpeed;
+        this.currentPosition.lerp(this.targetPosition, followSpeed * deltaTime);
+        
+        // Determine effective distance and direction multiplier
+        let effectiveDistance = this.distance;
+        let directionMultiplier = 1;
+        
+        if (this.isFrontFacing()) {
+            directionMultiplier = -1; // Camera in front of player
+        }
         
         // Calculate camera position based on angles and distance
-        const offsetX = Math.sin(this.yaw) * Math.cos(this.pitch) * this.distance;
-        const offsetY = Math.sin(this.pitch) * this.distance;
-        const offsetZ = Math.cos(this.yaw) * Math.cos(this.pitch) * this.distance;
+        const offsetX = Math.sin(this.yaw) * Math.cos(this.pitch) * effectiveDistance * directionMultiplier;
+        const offsetY = Math.sin(this.pitch) * effectiveDistance;
+        const offsetZ = Math.cos(this.yaw) * Math.cos(this.pitch) * effectiveDistance * directionMultiplier;
         
         const cameraPos = new THREE.Vector3(
             this.currentPosition.x - offsetX,
@@ -209,9 +264,48 @@ export class Camera3D {
             }
         }
         
-        // Set camera position and look at target
+        // Set camera position and look at target (or forward in first-person)
         this.camera.position.copy(cameraPos);
-        this.camera.lookAt(this.currentPosition);
+        
+        if (this.isFirstPerson()) {
+            // In first person, look in the direction of yaw/pitch
+            const lookTarget = new THREE.Vector3(
+                this.currentPosition.x + Math.sin(this.yaw) * Math.cos(this.pitch),
+                this.currentPosition.y + Math.sin(this.pitch),
+                this.currentPosition.z + Math.cos(this.yaw) * Math.cos(this.pitch)
+            );
+            this.camera.lookAt(lookTarget);
+        } else {
+            this.camera.lookAt(this.currentPosition);
+        }
+        
+        // Tell renderer to hide/show player model based on view mode
+        if (this.game.renderer3d && this.game.renderer3d.playerMesh) {
+            this.game.renderer3d.playerMesh.visible = !this.isFirstPerson();
+        }
+        
+        // Update sprint FOV effect
+        this.updateSprintFOV(deltaTime);
+    }
+    
+    /**
+     * Update FOV based on sprint state for Minecraft-style effect
+     */
+    updateSprintFOV(deltaTime) {
+        // Check if player is sprinting
+        const isSprinting = this.game.input?.isSprinting() && 
+                           (Math.abs(this.game.player?.vx) > 0.1 || Math.abs(this.game.player?.vy) > 0.1);
+        
+        this.targetFOV = isSprinting ? this.sprintFOV : this.baseFOV;
+        
+        // Smooth FOV transition
+        this.currentFOV += (this.targetFOV - this.currentFOV) * this.fovSmoothSpeed * deltaTime;
+        
+        // Apply FOV to camera
+        if (Math.abs(this.camera.fov - this.currentFOV) > 0.1) {
+            this.camera.fov = this.currentFOV;
+            this.camera.updateProjectionMatrix();
+        }
     }
     
     resize() {

@@ -205,6 +205,13 @@ export class InputManager {
             case 'KeyC':
                 this.actions.dash = true;
                 break;
+            case 'F5':
+                e.preventDefault();
+                // Toggle camera view mode (third-person, first-person, front-facing)
+                if (this.game.camera3d) {
+                    this.game.camera3d.toggleViewMode();
+                }
+                break;
         }
     }
 
