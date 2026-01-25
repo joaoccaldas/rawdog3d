@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Prehistoric Survival - 300,000 BC</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <div id="game-container">
+        <!-- Landing Page / Story Intro (hidden by default) -->
+        <div id="landing-page" class="landing-screen hidden">
+            <canvas id="story-canvas"></canvas>
+            <div id="story-text"></div>
+            <button id="skip-intro" class="skip-btn">Skip ▶</button>
+        </div>
+
+        <!-- Start Screen (shown first) -->
+        <div id="start-screen" class="menu-screen">
+            <div class="menu-logo">
+                <img src="assets/sprites/player/playercave.png" alt="Player" class="menu-character" width="128"
+                    height="128" />
+            </div>
+            <h1>🦣 Stone Age</h1>
+            <p class="tagline">Survive 300,000 BC</p>
+            <div class="name-input-container">
+                <label for="player-name">Enter Your Name</label>
+                <input type="text" id="player-name" class="name-input" placeholder="Survivor" maxlength="20"
+                    autocomplete="off" />
+            </div>
+            <div class="menu-buttons">
+                <button id="btn-new-game" class="menu-btn">Start Journey</button>
+                <button id="btn-builder-mode" class="menu-btn" style="background: linear-gradient(135deg, #2d5a27, #4a8a3a);">🔨 Builder Mode</button>
+                <button id="btn-load-game" class="menu-btn">Load Game</button>
+                <button id="btn-settings" class="menu-btn">Settings</button>
+            </div>
+            <div class="controls-hint">
+                <p>WASD - Move | Space - Jump | Left Click/F - Mine | Right Click/Q - Place | E - Inventory</p>
+            </div>
+            <p class="version">v0.6.0 - Prehistoric Update</p>
+        </div>
+
+        <!-- Pause Menu -->
+        <div id="pause-menu" class="modal hidden">
+            <div class="modal-content" style="text-align: center;">
+                <h2>Paused</h2>
+                <div class="menu-buttons">
+                    <button id="btn-resume" class="menu-btn">Resume</button>
+                    <button id="btn-save" class="menu-btn">Save Game</button>
+                    <button id="btn-quit" class="menu-btn">Quit to Title</button>
+                </div>
+
+                <!-- New: Quest Info in Pause Menu -->
+                <div id="pause-quest-info"
+                    style="margin-top: 20px; text-align: left; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; border: 1px solid #8B4513;">
+                    <h3
+                        style="color: #ffd700; border-bottom: 1px solid #555; padding-bottom: 5px; margin-bottom: 10px;">
+                        📜 Current Objectives</h3>
+                    <div id="pause-main-quest">No active main quest</div>
+                    <div id="pause-side-quests" style="margin-top: 10px; font-size: 0.9em; opacity: 0.8;"></div>
+                </div>
+            </div>
+        </div>
+
+        <canvas id="game-canvas" tabindex="0"></canvas>
+
+        <!-- Mobile Controls -->
+        <div id="mobile-controls">
+            <div id="joystick-container">
+                <div id="joystick-base">
+                    <div id="joystick-stick"></div>
+                </div>
+            </div>
+            <div id="action-buttons">
+                <button id="btn-mine" class="action-btn">⛏️</button>
+                <button id="btn-attack" class="action-btn">⚔️</button>
+                <button id="btn-jump" class="action-btn">⬆️</button>
+                <button id="btn-inventory" class="action-btn">🎒</button>
+            </div>
+        </div>
+
+        <!-- HUD -->
+        <div id="hud">
+            <div id="health-bar">
+                <div id="health-fill"></div>
+                <span id="health-text">100/100</span>
+            </div>
+            <div id="hunger-bar">
+                <div id="hunger-fill"></div>
+                <span id="hunger-text">100/100</span>
+            </div>
+
+            <!-- New: Temperature Bar -->
+            <div id="temperature-bar" title="Body Temperature">
+                <div id="temperature-fill"></div>
+                <span id="temperature-text">🌡️ 50°</span>
+            </div>
+
+            <!-- New: Armor Display -->
+            <div id="armor-display" title="Defense">
+                <span id="armor-text">🛡️ 0</span>
+            </div>
+
+            <div id="level-display">
+                <span id="level-text">Lvl 1</span>
+                <div id="xp-bar">
+                    <div id="xp-fill"></div>
+                </div>
+            </div>
+
+            <div id="day-cycle">
+                <span id="age-text">🦴 Stone Age</span>
+                <span id="day-text">Day 1</span>
+                <span id="time-text">☀️ 12:00</span>
+                <!-- New: Weather Display -->
+                <span id="weather-text">☀️ Clear</span>
+            </div>
+
+            <!-- New: Active Buffs Display -->
+            <div id="buffs-display"></div>
+
+            <!-- Quest Panel -->
+            <div id="quest-panel" class="hidden">
+                <div class="quest-header">
+                    <span class="quest-icon">🔥</span>
+                    <span class="quest-name">Loading...</span>
+                </div>
+                <div class="quest-description">Complete objectives to progress</div>
+                <div class="quest-objectives"></div>
+            </div>
+
+            <!-- Side Quest Panel -->
+            <div id="side-quest-panel" class="hidden">
+                <div class="no-quests">No active side quests</div>
+            </div>
+        </div>
+
+        <div id="hotbar"></div>
+
+        <!-- Inventory Screen -->
+        <div id="inventory-screen" class="modal hidden">
+            <div class="modal-content">
+                <h2>Inventory</h2>
+                <div id="inventory-grid"></div>
+                <div id="crafting-section">
+                    <h3>Crafting</h3>
+                    <div id="crafting-grid"></div>
+                    <div id="crafting-result"></div>
+                    <button id="craft-btn">Craft</button>
+                </div>
+                <button id="close-inventory" class="close-btn">✕</button>
+            </div>
+        </div>
+
+        <!-- Furnace Screen -->
+        <div id="furnace-screen" class="modal hidden">
+            <div class="modal-content">
+                <h2>Furnace</h2>
+                <div class="furnace-container"
+                    style="display:flex; align-items:center; gap:10px; justify-content:center;">
+                    <div id="furnace-input" class="inventory-slot"></div>
+                    <div>➡️</div>
+                    <div id="furnace-output" class="inventory-slot"></div>
+                </div>
+                <div style="text-align:center; margin-top:20px;">
+                    <button id="smelt-btn" class="action-btn"
+                        style="width:auto; padding:10px 30px; border-radius:8px;">🔥 Smelt</button>
+                    <p style="font-size:12px; opacity:0.7; margin-top:10px;">Requires Coal</p>
+                </div>
+                <button id="close-furnace" class="close-btn">✕</button>
+            </div>
+        </div>
+
+        <!-- Death Screen -->
+        <div id="death-screen" class="modal hidden">
+            <div class="modal-content">
+                <h2>You Died!</h2>
+                <p>Survived <span id="survival-days">0</span> days</p>
+                <button id="respawn-btn">Respawn</button>
+            </div>
+        </div>
+
+        <!-- Loading Screen -->
+        <div id="loading-screen">
+            <h1>🦴 Raw dogging 🦴</h1>
+            <p>Loading world...</p>
+            <div class="loading-bar">
+                <div id="loading-progress"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+
+</html>
