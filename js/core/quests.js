@@ -401,6 +401,9 @@ export class QuestManager {
         const questPanel = document.getElementById('quest-panel');
         if (!questPanel) return;
 
+        // Make sure panel is visible
+        questPanel.classList.remove('hidden');
+
         if (!this.activeQuest) {
             questPanel.innerHTML = '<div class="quest-empty">All quests complete!</div>';
             return;
@@ -409,11 +412,12 @@ export class QuestManager {
         const quest = this.activeQuest;
         const progressItems = quest.objectives.map(obj => {
             const complete = obj.current >= obj.required;
+            const current = obj.isDistance ? Math.floor(obj.current) : obj.current;
             return `
                 <div class="quest-objective ${complete ? 'complete' : ''}">
                     <span class="objective-check">${complete ? '✓' : '○'}</span>
                     <span class="objective-text">${obj.description}</span>
-                    <span class="objective-progress">${obj.current}/${obj.required}</span>
+                    <span class="objective-progress">${current}/${obj.required}</span>
                 </div>
             `;
         }).join('');

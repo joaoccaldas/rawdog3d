@@ -60,11 +60,48 @@ export class Renderer3D {
         // Held item display
         this.heldItemMesh = null;
         
+        // First-person hand
+        this.firstPersonHand = null;
+        this.firstPersonItem = null;
+        this.handBobTime = 0;
+        this.handBobIntensity = 0;
+        
         // Sky and environment
         this.skybox = null;
         this.ambientLight = null;
         this.sunLight = null;
         this.hemiLight = null;
+        
+        // Stars and clouds
+        this.stars = null;
+        this.clouds = null;
+        
+        // Underwater effects
+        this.underwaterOverlay = null;
+        this.isUnderwater = false;
+        
+        // Entity shadows
+        this.entityShadows = new Map();
+        
+        // Damage effects
+        this.damageFlashIntensity = 0;
+        this.damageTiltAngle = 0;
+        this.lowHealthPulse = 0;
+        
+        // Mining fatigue effect
+        this.miningFatigueOverlay = null;
+        this.miningFatigueIntensity = 0;
+        
+        // Grass decorations (swaying foliage)
+        this.grassDecorations = [];
+        this.grassSwayTime = 0;
+        
+        // Torch flicker time
+        this.torchFlickerTime = 0;
+        
+        // Rain particles
+        this.rainParticles = [];
+        this.maxRainParticles = 500;
         
         // Damage numbers
         this.damageNumbers = [];
@@ -103,6 +140,10 @@ export class Renderer3D {
         this.createPlacementPreview();
         this.createMiningOverlay();
         this.createHeldItemDisplay();
+        this.createFirstPersonHand();
+        this.createStars();
+        this.createClouds();
+        this.createUnderwaterOverlay();
         
         // Create player model
         this.createPlayerModel();
@@ -271,10 +312,11 @@ export class Renderer3D {
     }
     
     createSelectionBox() {
-        const geometry = new THREE.BoxGeometry(1.02, 1.02, 1.02);
+        const scale = CONFIG.BLOCK_OUTLINE_SCALE || 1.02;
+        const geometry = new THREE.BoxGeometry(scale, scale, scale);
         const edges = new THREE.EdgesGeometry(geometry);
         const material = new THREE.LineBasicMaterial({ 
-            color: 0xFFFFFF, // White for visibility
+            color: CONFIG.BLOCK_OUTLINE_COLOR || 0x000000, // Black for better visibility
             linewidth: 3
         });
         this.selectionBox = new THREE.LineSegments(edges, material);
@@ -394,6 +436,103 @@ export class Renderer3D {
         this.heldItemGroup.add(this.heldItemMesh);
     }
     
+    /**
+     * Create first-person hand/arm for FPS view
+     */
+    createFirstPersonHand() {
+        // Create hand group that will follow camera
+        this.firstPersonHand = new THREE.Group();
+        
+        // Arm (skin-colored box)
+        const armGeo = new THREE.BoxGeometry(0.15, 0.15, 0.5);
+        const skinMat = new THREE.MeshLambertMaterial({ color: 0xE0AC69 });
+        const arm = new THREE.Mesh(armGeo, skinMat);
+        arm.position.set(0, 0, -0.25);
+        this.firstPersonHand.add(arm);
+        
+        // Hand (slightly larger at end)
+        const handGeo = new THREE.BoxGeometry(0.18, 0.12, 0.15);
+        const hand = new THREE.Mesh(handGeo, skinMat);
+        hand.position.set(0, -0.02, -0.52);
+        this.firstPersonHand.add(hand);
+        
+        // Held item block (will be shown when holding item)
+        const itemGeo = new THREE.BoxGeometry(0.25, 0.25, 0.25);
+        const itemMat = new THREE.MeshLambertMaterial({ color: 0x8B5A2B });
+        this.firstPersonItem = new THREE.Mesh(itemGeo, itemMat);
+        this.firstPersonItem.position.set(0, 0.1, -0.55);
+        this.firstPersonItem.rotation.set(0.2, 0.3, 0);
+        this.firstPersonItem.visible = false;
+        this.firstPersonHand.add(this.firstPersonItem);
+        
+        // Base position (lower right of screen)
+        this.firstPersonHand.position.set(0.4, -0.3, -0.6);
+        this.firstPersonHand.rotation.set(-0.2, -0.4, 0);
+        
+        // Hand will be added to camera in updateFirstPersonHand
+        this.firstPersonHand.visible = false;
+    }
+    
+    /**
+     * Update first-person hand position with bob effect
+     */
+    updateFirstPersonHand(camera, player, deltaTime) {
+        if (!this.firstPersonHand || !camera) return;
+        
+        const isFirstPerson = this.game.camera3d?.isFirstPerson();
+        
+        if (isFirstPerson) {
+            // Ensure hand is in camera
+            if (this.firstPersonHand.parent !== camera) {
+                camera.add(this.firstPersonHand);
+            }
+            this.firstPersonHand.visible = true;
+            
+            // Calculate bob intensity based on movement
+            const isMoving = player && (Math.abs(player.vx) > 0.1 || Math.abs(player.vy) > 0.1);
+            const isSprinting = this.game.input?.isSprinting() && isMoving;
+            
+            // Target bob intensity
+            const targetIntensity = isMoving ? (isSprinting ? 0.08 : 0.05) : 0;
+            this.handBobIntensity += (targetIntensity - this.handBobIntensity) * deltaTime * 8;
+            
+            // Bob animation
+            if (isMoving) {
+                const bobSpeed = isSprinting ? 12 : 8;
+                this.handBobTime += deltaTime * bobSpeed;
+            } else {
+                // Slow bob return to center
+                this.handBobTime *= 0.95;
+            }
+            
+            // Calculate bob offsets
+            const bobX = Math.sin(this.handBobTime * 0.5) * this.handBobIntensity;
+            const bobY = Math.abs(Math.sin(this.handBobTime)) * this.handBobIntensity;
+            
+            // Base position + bob
+            this.firstPersonHand.position.set(
+                0.4 + bobX,
+                -0.3 + bobY,
+                -0.6
+            );
+            
+            // Update held item visibility and color
+            const selectedItem = player?.getSelectedItem?.();
+            if (selectedItem && this.firstPersonItem) {
+                this.firstPersonItem.visible = true;
+                const color = selectedItem.blockId ? 
+                    (BLOCK_DATA[selectedItem.blockId]?.color || '#8B5A2B') : 
+                    '#C0C0C0';
+                this.firstPersonItem.material.color.set(color);
+            } else if (this.firstPersonItem) {
+                this.firstPersonItem.visible = false;
+            }
+        } else {
+            // Third person - hide first person hand
+            this.firstPersonHand.visible = false;
+        }
+    }
+    
     updateHeldItem(item, camera) {
         if (!item || !this.heldItemMesh) return;
         
@@ -411,13 +550,16 @@ export class Renderer3D {
         }
     }
     
-    // Add/remove torch point lights
+    // Add/remove torch point lights with flicker
     addTorchLight(x, y, z) {
         const key = `${x},${y},${z}`;
         if (this.torchLights.has(key)) return;
         
         const light = new THREE.PointLight(0xFFAA44, 1, 10);
         light.position.set(x + 0.5, z + 0.5, y + 0.5);
+        light.userData.baseIntensity = 1;
+        light.userData.flickerOffset = Math.random() * Math.PI * 2;
+        light.userData.worldPos = { x, y, z };
         this.scene.add(light);
         this.torchLights.set(key, light);
     }
@@ -431,46 +573,67 @@ export class Renderer3D {
         }
     }
     
-    // Update sky color based on time of day
+    // Update sky color based on time of day with enhanced sunrise/sunset glow
     updateSkyColor(timeOfDay) {
         // timeOfDay: 0-1 where 0.5 is noon
         const dayColor = new THREE.Color(0x87CEEB); // Sky blue
         const sunsetColor = new THREE.Color(0xFF7F50); // Coral
+        const sunriseColor = new THREE.Color(0xFFB347); // Orange/peach
         const nightColor = new THREE.Color(0x191970); // Midnight blue
+        const goldenHour = new THREE.Color(0xFFD700); // Golden tint
         
         let skyColor;
         let sunIntensity;
         let ambientIntensity;
+        let sunColor = new THREE.Color(0xffffff);
         
-        if (timeOfDay < 0.2) {
-            // Night to dawn
-            const t = timeOfDay / 0.2;
-            skyColor = nightColor.clone().lerp(sunsetColor, t);
-            sunIntensity = 0.1 + t * 0.3;
-            ambientIntensity = 0.1 + t * 0.2;
+        if (timeOfDay < 0.15) {
+            // Deep night
+            const t = timeOfDay / 0.15;
+            skyColor = nightColor.clone();
+            sunIntensity = 0.05;
+            ambientIntensity = 0.08;
+        } else if (timeOfDay < 0.22) {
+            // Night to dawn (sunrise glow begins)
+            const t = (timeOfDay - 0.15) / 0.07;
+            skyColor = nightColor.clone().lerp(sunriseColor, t);
+            sunIntensity = 0.05 + t * 0.35;
+            ambientIntensity = 0.08 + t * 0.22;
+            sunColor = new THREE.Color(0xFF6B35).lerp(goldenHour, t);
         } else if (timeOfDay < 0.3) {
-            // Dawn to day
-            const t = (timeOfDay - 0.2) / 0.1;
-            skyColor = sunsetColor.clone().lerp(dayColor, t);
+            // Sunrise golden hour
+            const t = (timeOfDay - 0.22) / 0.08;
+            skyColor = sunriseColor.clone().lerp(dayColor, t);
             sunIntensity = 0.4 + t * 0.4;
             ambientIntensity = 0.3 + t * 0.1;
+            sunColor = goldenHour.clone().lerp(new THREE.Color(0xffffff), t);
         } else if (timeOfDay < 0.7) {
             // Day
             skyColor = dayColor;
             sunIntensity = 0.8;
             ambientIntensity = 0.4;
-        } else if (timeOfDay < 0.8) {
-            // Day to dusk
-            const t = (timeOfDay - 0.7) / 0.1;
+            sunColor = new THREE.Color(0xffffff);
+        } else if (timeOfDay < 0.78) {
+            // Day to golden hour (sunset begins)
+            const t = (timeOfDay - 0.7) / 0.08;
             skyColor = dayColor.clone().lerp(sunsetColor, t);
-            sunIntensity = 0.8 - t * 0.4;
+            sunIntensity = 0.8 - t * 0.3;
             ambientIntensity = 0.4 - t * 0.1;
+            sunColor = new THREE.Color(0xffffff).lerp(goldenHour, t);
+        } else if (timeOfDay < 0.85) {
+            // Sunset golden hour
+            const t = (timeOfDay - 0.78) / 0.07;
+            skyColor = sunsetColor.clone().lerp(new THREE.Color(0xFF4500), t);
+            sunIntensity = 0.5 - t * 0.25;
+            ambientIntensity = 0.3 - t * 0.1;
+            sunColor = goldenHour.clone().lerp(new THREE.Color(0xFF6B35), t);
         } else {
             // Dusk to night
-            const t = (timeOfDay - 0.8) / 0.2;
-            skyColor = sunsetColor.clone().lerp(nightColor, t);
-            sunIntensity = 0.4 - t * 0.3;
-            ambientIntensity = 0.3 - t * 0.2;
+            const t = (timeOfDay - 0.85) / 0.15;
+            skyColor = new THREE.Color(0xFF4500).lerp(nightColor, t);
+            sunIntensity = 0.25 - t * 0.2;
+            ambientIntensity = 0.2 - t * 0.12;
+            sunColor = new THREE.Color(0xFF6B35).lerp(new THREE.Color(0x444466), t);
         }
         
         // Apply colors
@@ -479,6 +642,7 @@ export class Renderer3D {
         
         if (this.sunLight) {
             this.sunLight.intensity = sunIntensity;
+            this.sunLight.color = sunColor;
             // Move sun position based on time
             const sunAngle = (timeOfDay - 0.25) * Math.PI * 2;
             this.sunLight.position.set(
@@ -490,7 +654,241 @@ export class Renderer3D {
         
         if (this.ambientLight) {
             this.ambientLight.intensity = ambientIntensity;
+            // Tint ambient during golden hours
+            if (timeOfDay > 0.15 && timeOfDay < 0.3) {
+                this.ambientLight.color = new THREE.Color(0xFFE4B5); // Warm tint
+            } else if (timeOfDay > 0.7 && timeOfDay < 0.85) {
+                this.ambientLight.color = new THREE.Color(0xFFD4A0); // Warm sunset tint
+            } else {
+                this.ambientLight.color = new THREE.Color(0xffffff);
+            }
         }
+        
+        // Update stars visibility (fade in at night)
+        if (this.stars) {
+            const isNight = timeOfDay < 0.2 || timeOfDay > 0.8;
+            const nightAmount = timeOfDay < 0.2 ? (0.2 - timeOfDay) / 0.2 : (timeOfDay - 0.8) / 0.2;
+            this.stars.material.opacity = isNight ? Math.min(nightAmount, 0.8) : 0;
+            this.stars.visible = isNight;
+        }
+    }
+    
+    /**
+     * Create starfield for night sky
+     */
+    createStars() {
+        const starsGeometry = new THREE.BufferGeometry();
+        const starCount = 2000;
+        const positions = new Float32Array(starCount * 3);
+        const sizes = new Float32Array(starCount);
+        
+        for (let i = 0; i < starCount; i++) {
+            // Distribute on a sphere
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            const radius = 400;
+            
+            positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+            positions[i * 3 + 1] = radius * Math.cos(phi); // Y is up
+            positions[i * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
+            
+            sizes[i] = Math.random() * 2 + 1;
+        }
+        
+        starsGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        starsGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+        
+        const starsMaterial = new THREE.PointsMaterial({
+            color: 0xffffff,
+            size: 2,
+            transparent: true,
+            opacity: 0,
+            sizeAttenuation: false
+        });
+        
+        this.stars = new THREE.Points(starsGeometry, starsMaterial);
+        this.stars.visible = false;
+        this.scene.add(this.stars);
+    }
+    
+    /**
+     * Create cloud layer
+     */
+    createClouds() {
+        const cloudGroup = new THREE.Group();
+        const cloudCount = 30;
+        
+        const cloudMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.7,
+            side: THREE.DoubleSide
+        });
+        
+        for (let i = 0; i < cloudCount; i++) {
+            // Create cloud from multiple overlapping planes
+            const cloud = new THREE.Group();
+            const puffCount = 3 + Math.floor(Math.random() * 4);
+            
+            for (let j = 0; j < puffCount; j++) {
+                const size = 10 + Math.random() * 20;
+                const puffGeo = new THREE.PlaneGeometry(size, size * 0.4);
+                const puff = new THREE.Mesh(puffGeo, cloudMaterial);
+                puff.position.set(
+                    (Math.random() - 0.5) * 15,
+                    (Math.random() - 0.5) * 2,
+                    (Math.random() - 0.5) * 5
+                );
+                puff.rotation.x = -Math.PI / 2; // Face up
+                cloud.add(puff);
+            }
+            
+            // Position cloud in sky
+            cloud.position.set(
+                (Math.random() - 0.5) * 400,
+                80 + Math.random() * 20, // Y height
+                (Math.random() - 0.5) * 400
+            );
+            
+            cloud.userData.speed = 0.5 + Math.random() * 1;
+            cloudGroup.add(cloud);
+        }
+        
+        this.clouds = cloudGroup;
+        this.scene.add(cloudGroup);
+    }
+    
+    /**
+     * Update cloud positions (drift)
+     */
+    updateClouds(deltaTime) {
+        if (!this.clouds) return;
+        
+        for (const cloud of this.clouds.children) {
+            cloud.position.x += cloud.userData.speed * deltaTime;
+            
+            // Wrap around
+            if (cloud.position.x > 200) {
+                cloud.position.x = -200;
+            }
+        }
+    }
+    
+    /**
+     * Update chunk fade-in animation
+     */
+    updateChunkFadeIn(deltaTime) {
+        const fadeSpeed = 3; // Chunks fully appear in ~0.3 seconds
+        
+        for (const mesh of this.chunkMeshes.values()) {
+            if (mesh.userData.fadeIn && mesh.userData.fadeProgress < 1) {
+                mesh.userData.fadeProgress += deltaTime * fadeSpeed;
+                
+                if (mesh.userData.fadeProgress >= 1) {
+                    mesh.userData.fadeProgress = 1;
+                    mesh.userData.fadeIn = false;
+                    mesh.material.transparent = false;
+                    mesh.material.opacity = 1;
+                    mesh.material.needsUpdate = true;
+                } else {
+                    mesh.material.opacity = mesh.userData.fadeProgress;
+                }
+            }
+        }
+    }
+    
+    /**
+     * Create underwater overlay effect
+     */
+    createUnderwaterOverlay() {
+        const overlayGeo = new THREE.PlaneGeometry(2, 2);
+        const overlayMat = new THREE.MeshBasicMaterial({
+            color: 0x1E90FF, // Dodger blue
+            transparent: true,
+            opacity: 0,
+            depthTest: false,
+            depthWrite: false
+        });
+        
+        this.underwaterOverlay = new THREE.Mesh(overlayGeo, overlayMat);
+        this.underwaterOverlay.renderOrder = 9998;
+        this.underwaterOverlay.frustumCulled = false;
+        // Note: This will be positioned in front of camera during render
+    }
+    
+    /**
+     * Update underwater effect based on player position
+     */
+    setUnderwater(isUnderwater) {
+        if (this.isUnderwater === isUnderwater) return;
+        this.isUnderwater = isUnderwater;
+        
+        if (isUnderwater) {
+            this.underwaterOverlay.material.opacity = 0.3;
+            this.scene.fog.near = 5;
+            this.scene.fog.far = 30;
+            this.scene.fog.color.set(0x1E4D7B);
+        } else {
+            this.underwaterOverlay.material.opacity = 0;
+            this.scene.fog.near = 50;
+            this.scene.fog.far = 150;
+        }
+    }
+    
+    /**
+     * Create a simple circular shadow for an entity
+     */
+    createEntityShadow(entityId) {
+        const shadowGeo = new THREE.CircleGeometry(0.4, 16);
+        const shadowMat = new THREE.MeshBasicMaterial({
+            color: 0x000000,
+            transparent: true,
+            opacity: 0.3,
+            depthWrite: false
+        });
+        
+        const shadow = new THREE.Mesh(shadowGeo, shadowMat);
+        shadow.rotation.x = -Math.PI / 2; // Lay flat
+        shadow.renderOrder = -1;
+        
+        this.entityShadows.set(entityId, shadow);
+        this.scene.add(shadow);
+        return shadow;
+    }
+    
+    /**
+     * Update entity shadow position
+     */
+    updateEntityShadow(entityId, x, y, z) {
+        let shadow = this.entityShadows.get(entityId);
+        if (!shadow) {
+            shadow = this.createEntityShadow(entityId);
+        }
+        
+        // Find ground level below entity
+        const groundZ = this.findGroundLevel(x, y, z);
+        shadow.position.set(x, groundZ + 0.01, y);
+        
+        // Scale and fade based on height
+        const height = z - groundZ;
+        const scale = Math.max(0.3, 1 - height * 0.1);
+        const opacity = Math.max(0.1, 0.3 - height * 0.03);
+        shadow.scale.set(scale, scale, 1);
+        shadow.material.opacity = opacity;
+    }
+    
+    /**
+     * Find ground level at position
+     */
+    findGroundLevel(x, y, z) {
+        const world = this.game.world;
+        for (let checkZ = Math.floor(z); checkZ >= 0; checkZ--) {
+            const block = world.getBlock(Math.floor(x), Math.floor(y), checkZ);
+            if (block !== BLOCKS.AIR && block !== BLOCKS.WATER) {
+                return checkZ + 1;
+            }
+        }
+        return 0;
     }
 
     createPlayerModel() {
@@ -505,6 +903,13 @@ export class Renderer3D {
         body.castShadow = true;
         group.add(body);
         
+        // Chestplate armor overlay (slightly larger)
+        const chestGeo = new THREE.BoxGeometry(0.65, 0.72, 0.35);
+        const chestMat = new THREE.MeshLambertMaterial({ color: 0x888888, transparent: true, opacity: 0 });
+        const chestplate = new THREE.Mesh(chestGeo, chestMat);
+        chestplate.position.y = 0.35;
+        group.add(chestplate);
+        
         // Head
         const headGeo = new THREE.BoxGeometry(0.4, 0.4, 0.4);
         const headMat = new THREE.MeshLambertMaterial({ color: 0xFFDBB4 }); // Skin color
@@ -512,6 +917,13 @@ export class Renderer3D {
         head.position.y = 0.9;
         head.castShadow = true;
         group.add(head);
+        
+        // Helmet armor overlay
+        const helmetGeo = new THREE.BoxGeometry(0.45, 0.42, 0.45);
+        const helmetMat = new THREE.MeshLambertMaterial({ color: 0x888888, transparent: true, opacity: 0 });
+        const helmet = new THREE.Mesh(helmetGeo, helmetMat);
+        helmet.position.y = 0.92;
+        group.add(helmet);
         
         // Hair
         const hairGeo = new THREE.BoxGeometry(0.42, 0.2, 0.42);
@@ -548,14 +960,131 @@ export class Renderer3D {
         rightLeg.castShadow = true;
         group.add(rightLeg);
         
+        // Leggings armor overlay
+        const leggingsGeo = new THREE.BoxGeometry(0.55, 0.62, 0.28);
+        const leggingsMat = new THREE.MeshLambertMaterial({ color: 0x888888, transparent: true, opacity: 0 });
+        const leggings = new THREE.Mesh(leggingsGeo, leggingsMat);
+        leggings.position.y = -0.3;
+        group.add(leggings);
+        
+        // Boots armor overlay
+        const bootGeo = new THREE.BoxGeometry(0.27, 0.25, 0.27);
+        const bootMat = new THREE.MeshLambertMaterial({ color: 0x888888, transparent: true, opacity: 0 });
+        const leftBoot = new THREE.Mesh(bootGeo, bootMat);
+        leftBoot.position.set(-0.15, -0.55, 0);
+        group.add(leftBoot);
+        
+        const rightBoot = new THREE.Mesh(bootGeo.clone(), bootMat.clone());
+        rightBoot.position.set(0.15, -0.55, 0);
+        group.add(rightBoot);
+        
         // Store references for animation
         group.userData = {
             body, head, hair, leftArm, rightArm, leftLeg, rightLeg,
-            walkCycle: 0
+            helmet, chestplate, leggings, leftBoot, rightBoot,
+            walkCycle: 0,
+            swingTime: 0,
+            isSwinging: false
         };
         
         this.playerMesh = group;
         this.scene.add(group);
+    }
+    
+    /**
+     * Update armor display on player model
+     */
+    updatePlayerArmor(player) {
+        if (!this.playerMesh || !player) return;
+        const ud = this.playerMesh.userData;
+        
+        // Armor color mapping
+        const armorColors = {
+            leather: 0x8B4513,
+            iron: 0xC0C0C0,
+            gold: 0xFFD700,
+            diamond: 0x00FFFF,
+            bone: 0xE8E8E0
+        };
+        
+        // Check each armor slot
+        const equippedArmor = player.equippedArmor || {};
+        
+        // Helmet
+        if (ud.helmet) {
+            const helm = equippedArmor.helmet || equippedArmor.head;
+            if (helm) {
+                const tier = this.getArmorTier(helm);
+                ud.helmet.material.color.set(armorColors[tier] || 0x888888);
+                ud.helmet.material.opacity = 0.9;
+                ud.hair.visible = false; // Hide hair when wearing helmet
+            } else {
+                ud.helmet.material.opacity = 0;
+                ud.hair.visible = true;
+            }
+        }
+        
+        // Chestplate
+        if (ud.chestplate) {
+            const chest = equippedArmor.chestplate || equippedArmor.chest;
+            if (chest) {
+                const tier = this.getArmorTier(chest);
+                ud.chestplate.material.color.set(armorColors[tier] || 0x888888);
+                ud.chestplate.material.opacity = 0.9;
+            } else {
+                ud.chestplate.material.opacity = 0;
+            }
+        }
+        
+        // Leggings
+        if (ud.leggings) {
+            const legs = equippedArmor.leggings || equippedArmor.legs;
+            if (legs) {
+                const tier = this.getArmorTier(legs);
+                ud.leggings.material.color.set(armorColors[tier] || 0x888888);
+                ud.leggings.material.opacity = 0.9;
+            } else {
+                ud.leggings.material.opacity = 0;
+            }
+        }
+        
+        // Boots
+        if (ud.leftBoot && ud.rightBoot) {
+            const boots = equippedArmor.boots || equippedArmor.feet;
+            if (boots) {
+                const tier = this.getArmorTier(boots);
+                ud.leftBoot.material.color.set(armorColors[tier] || 0x888888);
+                ud.leftBoot.material.opacity = 0.9;
+                ud.rightBoot.material.color.set(armorColors[tier] || 0x888888);
+                ud.rightBoot.material.opacity = 0.9;
+            } else {
+                ud.leftBoot.material.opacity = 0;
+                ud.rightBoot.material.opacity = 0;
+            }
+        }
+    }
+    
+    /**
+     * Get armor tier from item name
+     */
+    getArmorTier(item) {
+        if (!item) return 'leather';
+        const name = (item.name || item.id || '').toLowerCase();
+        if (name.includes('diamond')) return 'diamond';
+        if (name.includes('gold')) return 'gold';
+        if (name.includes('iron')) return 'iron';
+        if (name.includes('bone')) return 'bone';
+        return 'leather';
+    }
+    
+    /**
+     * Trigger arm swing animation (for mining/attacking)
+     */
+    triggerArmSwing() {
+        if (!this.playerMesh) return;
+        const ud = this.playerMesh.userData;
+        ud.isSwinging = true;
+        ud.swingTime = 0;
     }
     
     updatePlayerModel(player, deltaTime) {
@@ -569,11 +1098,29 @@ export class Renderer3D {
             this.playerMesh.rotation.y = -this.game.camera3d.yaw + Math.PI;
         }
         
-        // Walk animation
-        const isMoving = Math.abs(player.vx) > 0.01 || Math.abs(player.vy) > 0.01;
         const ud = this.playerMesh.userData;
         
-        if (isMoving) {
+        // Arm swing animation (mining/attacking)
+        if (ud.isSwinging) {
+            ud.swingTime += deltaTime * 15;
+            
+            // Swing arc: starts up, swings down
+            const swingProgress = ud.swingTime;
+            if (swingProgress < Math.PI) {
+                // Swing motion
+                const swingAngle = Math.sin(swingProgress) * 1.5;
+                ud.rightArm.rotation.x = -swingAngle;
+                ud.rightArm.rotation.z = Math.sin(swingProgress * 0.5) * 0.3;
+            } else {
+                ud.isSwinging = false;
+                ud.swingTime = 0;
+            }
+        }
+        
+        // Walk animation
+        const isMoving = Math.abs(player.vx) > 0.01 || Math.abs(player.vy) > 0.01;
+        
+        if (isMoving && !ud.isSwinging) {
             ud.walkCycle += deltaTime * 10;
             const swing = Math.sin(ud.walkCycle) * 0.5;
             
@@ -581,13 +1128,17 @@ export class Renderer3D {
             ud.rightArm.rotation.x = -swing;
             ud.leftLeg.rotation.x = -swing;
             ud.rightLeg.rotation.x = swing;
-        } else {
+        } else if (!ud.isSwinging) {
             // Reset to idle
             ud.leftArm.rotation.x *= 0.9;
             ud.rightArm.rotation.x *= 0.9;
             ud.leftLeg.rotation.x *= 0.9;
             ud.rightLeg.rotation.x *= 0.9;
+            ud.rightArm.rotation.z *= 0.9;
         }
+        
+        // Update armor display
+        this.updatePlayerArmor(player);
     }
     
     updateSelectionBox(x, y, z) {
@@ -800,6 +1351,12 @@ export class Renderer3D {
             mesh.castShadow = true;
             mesh.receiveShadow = true;
             
+            // Chunk fade-in animation
+            mesh.userData.fadeIn = true;
+            mesh.userData.fadeProgress = 0;
+            mesh.material.transparent = true;
+            mesh.material.opacity = 0;
+            
             this.scene.add(mesh);
             this.chunkMeshes.set(chunkKey, mesh);
         }
@@ -812,12 +1369,16 @@ export class Renderer3D {
             waterGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(waterUVs, 2));
             waterGeometry.setIndex(waterIndices);
             
-            const waterMaterial = new THREE.MeshLambertMaterial({
+            // Improved water material with better transparency
+            const waterMaterial = new THREE.MeshPhongMaterial({
                 map: this.atlasTexture,
-                color: 0x4169E1, // Blue tint for water
+                color: 0x3399FF, // Brighter blue tint for water
                 transparent: true,
-                opacity: 0.6,
-                side: THREE.DoubleSide
+                opacity: 0.7,
+                side: THREE.DoubleSide,
+                shininess: 100,
+                specular: 0x444444,
+                depthWrite: false // Better transparency sorting
             });
             
             const waterMesh = new THREE.Mesh(waterGeometry, waterMaterial);
@@ -1189,6 +1750,11 @@ export class Renderer3D {
         // Scale based on entity size
         const scale = entity.width || 1;
         sprite.scale.set(scale, entity.depth || 1.8, scale);
+        
+        // Item rotation (Minecraft-style spinning)
+        if (entity.rotationY !== undefined) {
+            sprite.rotation.y = entity.rotationY;
+        }
     }
     
     createEntitySprite(entity) {
@@ -1196,16 +1762,23 @@ export class Renderer3D {
         // Can be replaced with textured sprites later
         
         let color = 0x00ff00; // Default green
+        let isItem = false;
         
         if (entity.constructor.name === 'Player') {
             color = 0xffaa00; // Orange for player
         } else if (entity.constructor.name === 'Enemy') {
             color = 0xff0000; // Red for enemies
+        } else if (entity.constructor.name === 'ItemEntity') {
+            color = 0xffff00; // Yellow for items
+            isItem = true;
         } else if (entity.type === 'npc') {
             color = 0x00aaff; // Blue for NPCs
         }
         
-        const geometry = new THREE.BoxGeometry(0.6, 1.8, 0.6);
+        // Items are smaller floating cubes
+        const geometry = isItem ? 
+            new THREE.BoxGeometry(0.3, 0.3, 0.3) :
+            new THREE.BoxGeometry(0.6, 1.8, 0.6);
         const material = new THREE.MeshLambertMaterial({ color });
         const mesh = new THREE.Mesh(geometry, material);
         mesh.castShadow = true;
@@ -1260,6 +1833,29 @@ export class Renderer3D {
                 color,
                 { x: vx, y: vy, z: vz },
                 0.5 + Math.random() * 0.5
+            );
+        }
+    }
+    
+    /**
+     * Add sprinting dust particles at player's feet
+     */
+    addSprintParticles(px, py, pz, groundBlockId) {
+        const blockData = BLOCK_DATA[groundBlockId];
+        const color = blockData?.color || '#8B6914'; // Default dirt color
+        
+        // Spawn 2-3 small particles behind player
+        for (let i = 0; i < 2; i++) {
+            const vx = (Math.random() - 0.5) * 0.5;
+            const vy = (Math.random() - 0.5) * 0.5;
+            const vz = Math.random() * 0.5 + 0.2;
+            this.addParticle(
+                px + (Math.random() - 0.5) * 0.3,
+                py + (Math.random() - 0.5) * 0.3,
+                pz - 0.5,
+                color,
+                { x: vx, y: vy, z: vz },
+                0.3 + Math.random() * 0.2
             );
         }
     }
@@ -1382,9 +1978,270 @@ export class Renderer3D {
                 // Fade out
                 const alpha = (1 - progress) * 0.4;
                 this.damageOverlay.material.opacity = alpha;
+                
+                // Damage tilt effect
+                this.damageTiltAngle = Math.sin(progress * Math.PI) * 0.05 * (1 - progress);
             } else {
                 this.damageOverlay.material.opacity = 0;
                 this.damageFlashTime = 0;
+                this.damageTiltAngle = 0;
+            }
+        }
+        
+        // Low health pulse effect
+        if (this.game.player) {
+            const healthPercent = this.game.player.health / this.game.player.maxHealth;
+            if (healthPercent < 0.3) {
+                this.lowHealthPulse += deltaTime * 3;
+                const pulseIntensity = (0.3 - healthPercent) / 0.3;
+                const pulse = (Math.sin(this.lowHealthPulse) + 1) * 0.5 * pulseIntensity * 0.2;
+                
+                // Apply red vignette
+                if (this.damageOverlay) {
+                    const baseOpacity = this.damageFlashTime > 0 ? this.damageOverlay.material.opacity : 0;
+                    this.damageOverlay.material.opacity = Math.max(baseOpacity, pulse);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Update torch light flicker
+     */
+    updateTorchFlicker(deltaTime) {
+        this.torchFlickerTime += deltaTime;
+        
+        for (const light of this.torchLights.values()) {
+            const flicker = Math.sin(this.torchFlickerTime * 10 + light.userData.flickerOffset) * 0.15 +
+                           Math.sin(this.torchFlickerTime * 23 + light.userData.flickerOffset) * 0.1;
+            light.intensity = light.userData.baseIntensity + flicker;
+        }
+    }
+    
+    /**
+     * Set mining fatigue visual effect
+     */
+    setMiningFatigue(intensity) {
+        // Create overlay if needed
+        if (!this.miningFatigueOverlay) {
+            const overlayGeo = new THREE.PlaneGeometry(2, 2);
+            const overlayMat = new THREE.MeshBasicMaterial({
+                color: 0x4A4A4A, // Gray-brown fatigue color
+                transparent: true,
+                opacity: 0,
+                depthTest: false,
+                depthWrite: false
+            });
+            this.miningFatigueOverlay = new THREE.Mesh(overlayGeo, overlayMat);
+            this.miningFatigueOverlay.renderOrder = 9997;
+            this.miningFatigueOverlay.frustumCulled = false;
+        }
+        
+        this.miningFatigueIntensity = intensity;
+        // Pulsing fatigue effect
+        const pulse = Math.sin(this.torchFlickerTime * 4) * 0.05;
+        this.miningFatigueOverlay.material.opacity = Math.max(0, intensity * 0.3 + pulse);
+    }
+    
+    /**
+     * Update grass decorations sway
+     */
+    updateGrassDecorations(deltaTime) {
+        this.grassSwayTime += deltaTime;
+        
+        for (const grass of this.grassDecorations) {
+            // Gentle swaying motion
+            const sway = Math.sin(this.grassSwayTime * 2 + grass.userData.swayOffset) * 0.1;
+            grass.rotation.x = sway * 0.5;
+            grass.rotation.z = Math.sin(this.grassSwayTime * 1.5 + grass.userData.swayOffset * 2) * 0.1;
+        }
+    }
+    
+    /**
+     * Add grass decoration on a grass block
+     */
+    addGrassDecoration(x, y, z) {
+        // Create simple grass blade geometry
+        const bladeGeo = new THREE.PlaneGeometry(0.3, 0.5);
+        const bladeMat = new THREE.MeshLambertMaterial({
+            color: 0x228B22, // Forest green
+            transparent: true,
+            opacity: 0.9,
+            side: THREE.DoubleSide
+        });
+        
+        const blade = new THREE.Mesh(bladeGeo, bladeMat);
+        blade.position.set(
+            x + Math.random() * 0.6 + 0.2,
+            z + 1.25,
+            y + Math.random() * 0.6 + 0.2
+        );
+        blade.rotation.y = Math.random() * Math.PI;
+        blade.userData.swayOffset = Math.random() * Math.PI * 2;
+        
+        this.scene.add(blade);
+        this.grassDecorations.push(blade);
+    }
+    
+    /**
+     * Add torch smoke/ember particles
+     */
+    addTorchParticles(x, y, z) {
+        // Small orange ember
+        if (Math.random() < 0.3) {
+            this.addParticle(
+                x + 0.5 + (Math.random() - 0.5) * 0.2,
+                y + 0.5 + (Math.random() - 0.5) * 0.2,
+                z + 0.8,
+                '#FF6600',
+                { x: (Math.random() - 0.5) * 0.3, y: (Math.random() - 0.5) * 0.3, z: 0.5 + Math.random() * 0.5 },
+                0.5 + Math.random() * 0.5
+            );
+        }
+        // Gray smoke
+        if (Math.random() < 0.2) {
+            this.addParticle(
+                x + 0.5 + (Math.random() - 0.5) * 0.1,
+                y + 0.5 + (Math.random() - 0.5) * 0.1,
+                z + 0.9,
+                '#888888',
+                { x: (Math.random() - 0.5) * 0.2, y: (Math.random() - 0.5) * 0.2, z: 0.3 },
+                1 + Math.random() * 0.5
+            );
+        }
+    }
+    
+    /**
+     * Add critical hit star particles
+     */
+    addCriticalHitParticles(x, y, z) {
+        const colors = ['#FFFF00', '#FFD700', '#FFA500', '#FFFFFF'];
+        for (let i = 0; i < 8; i++) {
+            const angle = (i / 8) * Math.PI * 2;
+            const speed = 2 + Math.random() * 2;
+            this.addParticle(
+                x + (Math.random() - 0.5) * 0.3,
+                y + (Math.random() - 0.5) * 0.3,
+                z + 0.5,
+                colors[Math.floor(Math.random() * colors.length)],
+                { 
+                    x: Math.cos(angle) * speed, 
+                    y: Math.sin(angle) * speed, 
+                    z: 1 + Math.random() * 2 
+                },
+                0.5 + Math.random() * 0.3
+            );
+        }
+    }
+    
+    /**
+     * Flash an entity red when damaged
+     */
+    flashEntityRed(entityId) {
+        const mesh = this.entityMeshes.get(entityId);
+        if (mesh) {
+            mesh.userData.hurtFlash = 0.3; // Flash duration
+            mesh.userData.originalColor = mesh.material.color.clone();
+        }
+    }
+    
+    /**
+     * Spawn experience orb at position
+     */
+    spawnExperienceOrb(x, y, z, amount = 1) {
+        // Create glowing green orb
+        const orbGeo = new THREE.SphereGeometry(0.15, 8, 8);
+        const orbMat = new THREE.MeshBasicMaterial({
+            color: 0x00FF00,
+            transparent: true,
+            opacity: 0.9
+        });
+        const orb = new THREE.Mesh(orbGeo, orbMat);
+        orb.position.set(x + 0.5, z + 0.5, y + 0.5);
+        orb.userData = {
+            type: 'xp_orb',
+            amount: amount,
+            age: 0,
+            bobOffset: Math.random() * Math.PI * 2,
+            vx: (Math.random() - 0.5) * 2,
+            vy: (Math.random() - 0.5) * 2,
+            vz: Math.random() * 3 + 1
+        };
+        
+        // Add glow
+        const glowGeo = new THREE.SphereGeometry(0.25, 8, 8);
+        const glowMat = new THREE.MeshBasicMaterial({
+            color: 0x88FF88,
+            transparent: true,
+            opacity: 0.3
+        });
+        const glow = new THREE.Mesh(glowGeo, glowMat);
+        orb.add(glow);
+        
+        this.scene.add(orb);
+        
+        if (!this.xpOrbs) this.xpOrbs = [];
+        this.xpOrbs.push(orb);
+    }
+    
+    /**
+     * Update XP orbs - move toward player and collect
+     */
+    updateXPOrbs(deltaTime) {
+        if (!this.xpOrbs) return;
+        
+        const player = this.game.player;
+        if (!player) return;
+        
+        for (let i = this.xpOrbs.length - 1; i >= 0; i--) {
+            const orb = this.xpOrbs[i];
+            orb.userData.age += deltaTime;
+            
+            // Bob animation
+            const bob = Math.sin(orb.userData.age * 3 + orb.userData.bobOffset) * 0.1;
+            
+            // Apply velocity initially
+            if (orb.userData.age < 0.5) {
+                orb.position.x += orb.userData.vx * deltaTime;
+                orb.position.z += orb.userData.vy * deltaTime;
+                orb.position.y += orb.userData.vz * deltaTime;
+                orb.userData.vz -= 9.8 * deltaTime;
+            } else {
+                // Attract toward player
+                const dx = player.x - orb.position.x;
+                const dy = player.y - orb.position.z;
+                const dz = (player.z + 1) - orb.position.y;
+                const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                
+                if (dist < 2) {
+                    // Move toward player faster when close
+                    const speed = 8 / Math.max(0.5, dist);
+                    orb.position.x += (dx / dist) * speed * deltaTime;
+                    orb.position.z += (dy / dist) * speed * deltaTime;
+                    orb.position.y += (dz / dist) * speed * deltaTime + bob * 0.5;
+                    
+                    // Collect when very close
+                    if (dist < 0.5) {
+                        player.gainXP?.(orb.userData.amount);
+                        this.game.audio?.play('xp');
+                        this.scene.remove(orb);
+                        orb.geometry.dispose();
+                        orb.material.dispose();
+                        this.xpOrbs.splice(i, 1);
+                        continue;
+                    }
+                } else {
+                    // Gentle bob
+                    orb.position.y += bob * deltaTime;
+                }
+            }
+            
+            // Despawn after 30 seconds
+            if (orb.userData.age > 30) {
+                this.scene.remove(orb);
+                orb.geometry.dispose();
+                orb.material.dispose();
+                this.xpOrbs.splice(i, 1);
             }
         }
     }
@@ -1436,6 +2293,24 @@ export class Renderer3D {
         // Update player model
         if (this.game.player) {
             this.updatePlayerModel(this.game.player, deltaTime);
+            
+            // Update player shadow
+            this.updateEntityShadow('player', 
+                this.game.player.x, 
+                this.game.player.y, 
+                this.game.player.z
+            );
+            
+            // Check if player is underwater
+            const headBlock = this.game.world.getBlock(
+                Math.floor(this.game.player.x),
+                Math.floor(this.game.player.y),
+                Math.floor(this.game.player.z + 1.5)
+            );
+            this.setUnderwater(headBlock === BLOCKS.WATER);
+            
+            // Update first-person hand with bob
+            this.updateFirstPersonHand(camera3d.camera, this.game.player, deltaTime);
         }
         
         // Update sun shadow camera to follow player
@@ -1445,16 +2320,57 @@ export class Renderer3D {
             const pz = this.game.player.z;
             
             this.sunLight.target.position.set(px, pz, py);
+            
+            // Move stars with player
+            if (this.stars) {
+                this.stars.position.set(px, 0, py);
+            }
+        }
+        
+        // Update clouds
+        this.updateClouds(deltaTime);
+        
+        // Update chunk fade-in animation
+        this.updateChunkFadeIn(deltaTime);
+        
+        // Update torch flicker
+        this.updateTorchFlicker(deltaTime);
+        
+        // Update grass decorations sway
+        this.updateGrassDecorations(deltaTime);
+        
+        // Update torch particles (spawn occasionally)
+        if (!this.torchParticleTimer) this.torchParticleTimer = 0;
+        this.torchParticleTimer -= deltaTime;
+        if (this.torchParticleTimer <= 0) {
+            this.torchParticleTimer = 0.1;
+            for (const light of this.torchLights.values()) {
+                const pos = light.userData.worldPos;
+                if (pos) {
+                    this.addTorchParticles(pos.x, pos.y, pos.z);
+                }
+            }
         }
         
         // Update particles
         this.updateParticles(deltaTime);
+        
+        // Update XP orbs
+        this.updateXPOrbs(deltaTime);
+        
+        // Update rain/snow particles
+        this.updateRainParticles(deltaTime);
         
         // Update damage numbers
         this.updateDamageNumbers(deltaTime);
         
         // Update damage flash effect
         this.updateDamageFlash(deltaTime);
+        
+        // Apply camera damage tilt
+        if (camera3d && this.damageTiltAngle !== 0) {
+            camera3d.camera.rotation.z = this.damageTiltAngle;
+        }
         
         this.renderer.render(this.scene, camera3d.camera);
     }
@@ -1494,6 +2410,96 @@ export class Renderer3D {
         this.waterMeshes.clear();
         
         console.log('Renderer3D: Cleared all chunk meshes');
+    }
+    
+    /**
+     * Update 3D rain particles
+     */
+    updateRainParticles(deltaTime) {
+        const weather = this.game.weather?.currentWeather;
+        const isRaining = weather && (weather.name === 'Rain' || weather.name === 'Heavy Rain' || weather.name === 'Thunderstorm');
+        const isSnowing = weather && (weather.name === 'Snow' || weather.name === 'Blizzard');
+        
+        if (!isRaining && !isSnowing) {
+            // Remove existing rain particles
+            for (const p of this.rainParticles) {
+                this.scene.remove(p.mesh);
+                p.mesh.geometry.dispose();
+                p.mesh.material.dispose();
+            }
+            this.rainParticles = [];
+            return;
+        }
+        
+        const player = this.game.player;
+        if (!player) return;
+        
+        // Spawn new particles
+        const targetCount = isSnowing ? 200 : (weather.name === 'Heavy Rain' ? 400 : 250);
+        while (this.rainParticles.length < targetCount) {
+            const spread = 30;
+            const geo = isSnowing ? 
+                new THREE.SphereGeometry(0.03, 4, 4) :
+                new THREE.CylinderGeometry(0.02, 0.02, 0.3, 4);
+            const mat = new THREE.MeshBasicMaterial({
+                color: isSnowing ? 0xFFFFFF : 0x88AACC,
+                transparent: true,
+                opacity: isSnowing ? 0.9 : 0.6
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(
+                player.x + (Math.random() - 0.5) * spread,
+                player.z + 20 + Math.random() * 10,
+                player.y + (Math.random() - 0.5) * spread
+            );
+            
+            if (!isSnowing) {
+                mesh.rotation.x = Math.PI / 2;
+            }
+            
+            this.scene.add(mesh);
+            this.rainParticles.push({
+                mesh,
+                vz: isSnowing ? -2 - Math.random() : -15 - Math.random() * 5,
+                vx: isSnowing ? (Math.random() - 0.5) * 2 : 0
+            });
+        }
+        
+        // Update particles
+        for (let i = this.rainParticles.length - 1; i >= 0; i--) {
+            const p = this.rainParticles[i];
+            p.mesh.position.y += p.vz * deltaTime;
+            p.mesh.position.x += (p.vx || 0) * deltaTime;
+            
+            // Reset if below ground
+            if (p.mesh.position.y < player.z - 5) {
+                p.mesh.position.set(
+                    player.x + (Math.random() - 0.5) * 30,
+                    player.z + 20 + Math.random() * 10,
+                    player.y + (Math.random() - 0.5) * 30
+                );
+            }
+        }
+    }
+    
+    /**
+     * Add water splash particles (for walking in shallow water)
+     */
+    addWaterSplash(x, y, z) {
+        for (let i = 0; i < 5; i++) {
+            this.addParticle(
+                x + (Math.random() - 0.5) * 0.5,
+                y + (Math.random() - 0.5) * 0.5,
+                z,
+                '#88CCFF',
+                { 
+                    x: (Math.random() - 0.5) * 2, 
+                    y: (Math.random() - 0.5) * 2, 
+                    z: 1 + Math.random() * 2 
+                },
+                0.3 + Math.random() * 0.2
+            );
+        }
     }
     
     /**

@@ -23,30 +23,66 @@ export class ItemEntity extends Entity {
 
         // Pickup
         this.pickupDelay = 500; // ms before can be picked up
+        this.attractRange = 3.0; // Start attracting to player
+        this.attractSpeed = 8.0; // Speed when attracted
+        this.beingAttracted = false;
+        this.rotationY = Math.random() * Math.PI * 2;
     }
 
     update(deltaTime) {
         const now = Date.now();
+        const player = this.game.player;
 
-        // Floating animation
-        if (this.grounded) {
-            this.z = this.originalZ + Math.sin((now / 500) + this.floatOffset) * 0.1;
-        } else {
-            // Gravity
-            this.vz -= CONFIG.GRAVITY * deltaTime * 0.5; // Slower gravity for items?
-            this.z += this.vz * deltaTime;
+        // Rotation animation (Minecraft-style spinning)
+        this.rotationY += deltaTime * 2;
 
-            // Floor collision
-            const floor = Math.floor(this.z);
-            if (this.game.world.getBlock(Math.floor(this.x), Math.floor(this.y), floor) !== 0) {
-                this.blockCollision(floor + 1);
+        // Check if should attract to player
+        if (player && now - this.creationTime > this.pickupDelay) {
+            const dx = player.x - this.x;
+            const dy = player.y - this.y;
+            const dz = (player.z + 0.5) - this.z;
+            const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+            if (dist < this.attractRange && dist > 0.3) {
+                // Attract toward player (like Minecraft magnet effect)
+                this.beingAttracted = true;
+                const speed = this.attractSpeed * deltaTime;
+                const factor = Math.min(speed / dist, 1);
+                this.x += dx * factor;
+                this.y += dy * factor;
+                this.z += dz * factor;
+                this.grounded = false; // Allow vertical movement
+            } else if (dist <= 0.3) {
+                // Close enough to collect
+                if (player.addItem(this.itemType)) {
+                    this.isDead = true;
+                    if (this.game.audio) {
+                        this.game.audio.play('pickup');
+                    }
+                }
             }
         }
 
-        // Pickup Logic
-        if (now - this.creationTime > this.pickupDelay) {
-            this.checkPickup();
+        // Only apply normal physics if not being attracted
+        if (!this.beingAttracted) {
+            // Floating animation
+            if (this.grounded) {
+                this.z = this.originalZ + Math.sin((now / 500) + this.floatOffset) * 0.1;
+            } else {
+                // Gravity
+                this.vz -= CONFIG.GRAVITY * deltaTime * 0.5;
+                this.z += this.vz * deltaTime;
+
+                // Floor collision
+                const floor = Math.floor(this.z);
+                if (this.game.world.getBlock(Math.floor(this.x), Math.floor(this.y), floor) !== 0) {
+                    this.blockCollision(floor + 1);
+                }
+            }
         }
+
+        // Reset attraction state for next frame
+        this.beingAttracted = false;
     }
 
     blockCollision(groundZ) {
@@ -57,20 +93,6 @@ export class ItemEntity extends Entity {
     }
 
     checkPickup() {
-        const player = this.game.player;
-        if (!player) return;
-
-        const dist = Math.sqrt(
-            Math.pow(this.x - player.x, 2) +
-            Math.pow(this.y - player.y, 2) +
-            Math.pow(this.z - player.z, 2)
-        );
-
-        if (dist < 1.5) { // Pickup range
-            if (player.addItem(this.itemType)) {
-                this.isDead = true;
-                // TODO: Play pickup sound
-            }
-        }
+        // Pickup logic now handled in update() with attraction
     }
 }

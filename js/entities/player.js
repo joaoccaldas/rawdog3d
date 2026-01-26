@@ -30,6 +30,16 @@ export class Player extends Entity {
         this.isSwimming = false;
         this.airTime = CONFIG.DROWNING_TIME;
         this.drowningTimer = 0;
+        this.breath = 10; // Breath bubbles (like Minecraft)
+        this.maxBreath = 10;
+        
+        // Sneaking (edge prevention)
+        this.isSneaking = false;
+        this.sneakSpeed = CONFIG.PLAYER_SPEED * 0.3;
+        
+        // Ladder climbing
+        this.isOnLadder = false;
+        this.climbSpeed = 3;
 
         // Progression
         this.xp = 0;
@@ -413,29 +423,60 @@ export class Player extends Entity {
         const wasInWater = this.isInWater;
         this.isInWater = blockAtFeet === BLOCKS.WATER || blockAtHead === BLOCKS.WATER;
         this.isSwimming = blockAtHead === BLOCKS.WATER; // Fully submerged
+        
+        // Check if on ladder
+        const wasOnLadder = this.isOnLadder;
+        this.isOnLadder = blockAtFeet === BLOCKS.LADDER || blockAtHead === BLOCKS.LADDER;
+        
+        // Breath system (underwater)
+        if (this.isSwimming) {
+            this.drowningTimer += dt;
+            if (this.drowningTimer >= 1) {
+                this.drowningTimer = 0;
+                this.breath = Math.max(0, this.breath - 1);
+                
+                // Drowning damage when out of breath
+                if (this.breath <= 0) {
+                    this.takeDamage(2, null, 'drowning');
+                    this.game.particles?.emit(this.x, this.y, this.z + 1.5, '#4169E1', 3);
+                }
+            }
+        } else {
+            // Restore breath when above water
+            this.breath = Math.min(this.maxBreath, this.breath + dt * 3);
+            this.drowningTimer = 0;
+        }
 
         // Water entry splash
         if (this.isInWater && !wasInWater) {
             this.game.audio.play('splash');
             this.game.particles.emit(this.x, this.y, this.z, '#4169E1', 10);
         }
+        
+        // Ladder grab sound
+        if (this.isOnLadder && !wasOnLadder) {
+            this.game.audio?.play('hit');
+        }
 
         // Track fall start position
-        if (!this.grounded && this.vz < 0 && !this.wasFalling) {
+        if (!this.grounded && this.vz < 0 && !this.wasFalling && !this.isOnLadder) {
             this.fallStartZ = this.z;
             this.wasFalling = true;
         }
 
         // Coyote Time Logic
-        if (this.grounded) {
-            this.coyoteTime = 0.1; // Reset coyote time while grounded
+        if (this.grounded || this.isOnLadder) {
+            this.coyoteTime = 0.1; // Reset coyote time while grounded or on ladder
         } else {
             this.coyoteTime -= deltaTime;
         }
 
-        // Apply gravity (reduced in water)
+        // Apply gravity (reduced in water, none on ladder)
         if (!this.grounded) {
-            if (this.isInWater) {
+            if (this.isOnLadder) {
+                // Ladder physics - no gravity, can climb up/down
+                this.vz *= 0.8; // Slow vertical momentum on ladder
+            } else if (this.isInWater) {
                 // Water physics - slower fall, can swim up
                 this.vz -= CONFIG.GRAVITY * CONFIG.WATER_DRAG;
                 this.vz = Math.max(this.vz, -2); // Terminal velocity in water
@@ -464,8 +505,8 @@ export class Player extends Entity {
             this.walkTimer -= deltaTime;
             if (this.walkTimer <= 0) {
                 this.walkTimer = 0.4; // Step interval
-                // Pitch shift for variety? Audio manager handles simple play
-                this.game.audio.play('walk');
+                // Play footstep with block-based sound
+                this.playFootstep();
             }
         } else {
             this.walkTimer = 0; // Reset
@@ -563,12 +604,32 @@ export class Player extends Entity {
                 this.wasFalling = false;
 
                 // Landing on ground
-                this.grounded = true;
-                // Snap to the top of the block we landed on
-                // Find the actual ground level by checking from current position down
-                const groundZ = Math.floor(this.z);
-                this.z = groundZ;
-                this.vz = 0;
+                // Check for slime block bounce
+                const landingBlock = this.game.world.getBlock(
+                    Math.floor(this.x),
+                    Math.floor(this.y),
+                    Math.floor(this.z - 0.1)
+                );
+                const landingBlockData = BLOCK_DATA[landingBlock];
+                
+                if (landingBlockData?.bouncy) {
+                    // Slime block bounce!
+                    const bounceMultiplier = landingBlockData.bounceMultiplier || 1.2;
+                    this.vz = Math.abs(this.vz) * bounceMultiplier;
+                    this.grounded = false;
+                    this.wasFalling = false;
+                    
+                    // Bounce effect
+                    this.game.audio?.play('jump');
+                    this.game.particles?.emit(this.x, this.y, this.z, '#7FFF00', 5);
+                } else {
+                    this.grounded = true;
+                    // Snap to the top of the block we landed on
+                    // Find the actual ground level by checking from current position down
+                    const groundZ = Math.floor(this.z);
+                    this.z = groundZ;
+                    this.vz = 0;
+                }
             } else {
                 // Hit ceiling
                 this.vz = 0;
@@ -585,6 +646,50 @@ export class Player extends Entity {
             this.grounded = false;
             if (this.game.camera) this.game.camera.snapToTarget();
         }
+    }
+    
+    /**
+     * Play footstep sound based on block type beneath player
+     */
+    playFootstep() {
+        const blockBelow = this.game.world.getBlock(
+            Math.floor(this.x), 
+            Math.floor(this.y), 
+            Math.floor(this.z - 0.1)
+        );
+        
+        // Check if feet are in water (shallow water walking)
+        const feetBlock = this.game.world.getBlock(
+            Math.floor(this.x),
+            Math.floor(this.y),
+            Math.floor(this.z + 0.1)
+        );
+        
+        if (feetBlock === BLOCKS.WATER) {
+            // Water splash effect
+            this.game.audio?.play('splash');
+            if (this.game.renderer3d?.addWaterSplash) {
+                this.game.renderer3d.addWaterSplash(this.x, this.y, this.z);
+            }
+            return;
+        }
+        
+        // Map block types to sound categories
+        const blockData = BLOCK_DATA[blockBelow];
+        let soundType = 'walk'; // Default
+        
+        if (blockBelow === BLOCKS.GRASS || blockBelow === BLOCKS.LEAVES) {
+            soundType = 'walk'; // Soft step
+        } else if (blockBelow === BLOCKS.STONE || blockBelow === BLOCKS.COBBLESTONE || 
+                   blockBelow === BLOCKS.IRON_ORE || blockBelow === BLOCKS.GOLD_ORE) {
+            soundType = 'hit'; // Hard step
+        } else if (blockBelow === BLOCKS.SAND) {
+            soundType = 'walk'; // Crunchy step
+        } else if (blockBelow === BLOCKS.WOOD || blockBelow === BLOCKS.OAK_PLANKS) {
+            soundType = 'place'; // Wooden step
+        }
+        
+        this.game.audio?.play(soundType);
     }
 
     checkCollision(x, y, z) {

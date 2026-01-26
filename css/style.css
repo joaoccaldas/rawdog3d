@@ -297,6 +297,16 @@ body {
     box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
 }
 
+.hotbar-slot .slot-number {
+    position: absolute;
+    top: 2px;
+    left: 4px;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.6);
+    text-shadow: 1px 1px 1px black;
+    font-weight: bold;
+}
+
 .hotbar-slot .item-count {
     position: absolute;
     bottom: 2px;
@@ -305,6 +315,47 @@ body {
     color: white;
     text-shadow: 1px 1px 2px black;
     font-weight: bold;
+}
+
+/* Breath Meter */
+#breath-meter {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.5);
+    padding: 5px 15px;
+    border-radius: 10px;
+    font-size: 18px;
+    z-index: 100;
+}
+
+#breath-bubbles {
+    letter-spacing: 2px;
+}
+
+/* Time Display */
+#time-display {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.5);
+    padding: 5px 15px;
+    border-radius: 5px;
+    color: white;
+    font-size: 14px;
+    z-index: 100;
+    display: flex;
+    gap: 15px;
+}
+
+#day-count {
+    font-weight: bold;
+}
+
+#time-clock {
+    opacity: 0.9;
 }
 
 .durability-container {

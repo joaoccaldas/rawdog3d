@@ -190,6 +190,9 @@ class Game3D {
         // Setup pointer lock
         this.setupPointerLock();
         
+        // Setup hotbar tooltips
+        this.setupHotbarTooltips();
+        
         // Start game loop
         requestAnimationFrame((t) => this.gameLoop(t));
         
@@ -303,6 +306,102 @@ class Game3D {
         
         document.addEventListener('pointerlockerror', () => {
             console.error('Game3D: Pointer lock failed');
+        });
+    }
+    
+    /**
+     * Setup hotbar slot hover tooltips
+     */
+    setupHotbarTooltips() {
+        const tooltip = document.getElementById('item-tooltip');
+        const slots = document.querySelectorAll('.hotbar-slot');
+        
+        if (!tooltip) return;
+        
+        slots.forEach((slot, index) => {
+            slot.addEventListener('mouseenter', (e) => {
+                const item = this.player?.hotbar?.[index];
+                if (item) {
+                    const itemData = ITEMS[item.id] || {};
+                    const name = itemData.name || item.id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    tooltip.querySelector('.tooltip-name').textContent = name;
+                    tooltip.querySelector('.tooltip-desc').textContent = itemData.description || '';
+                    tooltip.style.display = 'block';
+                    
+                    // Position near slot
+                    const rect = slot.getBoundingClientRect();
+                    tooltip.style.left = rect.left + 'px';
+                    tooltip.style.top = (rect.top - tooltip.offsetHeight - 10) + 'px';
+                }
+            });
+            
+            slot.addEventListener('mouseleave', () => {
+                tooltip.style.display = 'none';
+            });
+        });
+    }
+    
+    /**
+     * Update hotbar UI with item counts and durability bars
+     */
+    updateHotbarUI() {
+        const slots = document.querySelectorAll('.hotbar-slot');
+        if (!this.player?.hotbar) return;
+        
+        slots.forEach((slot, index) => {
+            const item = this.player.hotbar[index];
+            
+            // Clear existing content except slot number
+            const slotNumber = slot.querySelector('.slot-number');
+            slot.innerHTML = '';
+            if (slotNumber) slot.appendChild(slotNumber.cloneNode(true));
+            
+            // Update selection
+            slot.classList.toggle('selected', index === this.player.selectedSlot);
+            
+            if (item) {
+                // Add emoji
+                const emoji = document.createElement('span');
+                emoji.className = 'item-emoji';
+                emoji.textContent = item.emoji || '?';
+                slot.appendChild(emoji);
+                
+                // Add count if > 1
+                if (item.count > 1) {
+                    const count = document.createElement('span');
+                    count.className = 'item-count';
+                    count.textContent = item.count;
+                    slot.appendChild(count);
+                }
+                
+                // Add durability bar for tools/weapons
+                const itemData = ITEMS[item.id];
+                if (itemData && itemData.durability && item.durability !== undefined) {
+                    const pct = (item.durability / itemData.durability) * 100;
+                    
+                    // Only show if damaged
+                    if (pct < 100) {
+                        const bar = document.createElement('div');
+                        bar.className = 'durability-bar';
+                        
+                        const fill = document.createElement('div');
+                        fill.className = 'durability-fill';
+                        fill.style.width = pct + '%';
+                        
+                        // Color based on percentage
+                        if (pct > 50) {
+                            fill.style.background = '#51cf66'; // Green
+                        } else if (pct > 20) {
+                            fill.style.background = '#fab005'; // Yellow
+                        } else {
+                            fill.style.background = '#ff6b6b'; // Red
+                        }
+                        
+                        bar.appendChild(fill);
+                        slot.appendChild(bar);
+                    }
+                }
+            }
         });
     }
     
@@ -797,9 +896,13 @@ class Game3D {
         // World update (time, spawning, etc)
         this.world.update(deltaTime);
         
+        // Update falling blocks (sand, gravel)
+        this.updateFallingBlocks(deltaTime);
+        
         // Player update with 3D input
         if (this.player) {
             this.updatePlayer3D(deltaTime);
+            this.updateBreathMeter();
         }
         
         // Camera update
@@ -807,6 +910,12 @@ class Game3D {
         
         // Update day/night lighting
         this.renderer3d.updateDayNightCycle(this.world.timeOfDay);
+        
+        // Update time display
+        this.updateTimeDisplay();
+        
+        // Update ambient sounds (cave detection)
+        this.updateAmbientSounds(deltaTime);
         
         // Update entities (but NOT the player - player has its own model)
         for (const entity of this.entities) {
@@ -825,6 +934,9 @@ class Game3D {
         // Update block selection
         this.updateBlockSelection();
         
+        // Update hotbar UI (durability bars)
+        this.updateHotbarUI();
+        
         // Save manager
         this.saveManager.update(Date.now());
     }
@@ -837,20 +949,103 @@ class Game3D {
         const movement = input.getWorldMovement(this.camera3d);
         
         // Apply movement to player velocity
-        const speed = input.isSprinting() ? player.speed * 1.5 : player.speed;
+        // Check if sneaking (shift)
+        const isSneaking = input.isSprinting() === false && this.input.keys['ShiftLeft'];
+        player.isSneaking = isSneaking;
         
-        player.vx = movement.x * speed;
-        player.vy = movement.y * speed;
+        // Speed based on state
+        let speed = player.speed;
+        if (isSneaking) {
+            speed = player.sneakSpeed || player.speed * 0.3;
+        } else if (input.isSprinting()) {
+            speed = player.speed * 1.5;
+        }
         
-        // Jump
-        if (input.isJumping() && player.grounded) {
+        // Calculate desired movement
+        let moveX = movement.x * speed;
+        let moveY = movement.y * speed;
+        
+        // Sneaking edge prevention
+        if (isSneaking && player.grounded) {
+            // Check if moving would put us over an edge
+            const nextX = player.x + moveX * 0.1;
+            const nextY = player.y + moveY * 0.1;
+            
+            // Check ground below next position
+            const groundBelowNext = this.world.getBlock(
+                Math.floor(nextX), 
+                Math.floor(nextY), 
+                Math.floor(player.z - 0.1)
+            );
+            
+            // If no ground below, prevent movement in that direction
+            if (groundBelowNext === BLOCKS.AIR || groundBelowNext === BLOCKS.WATER) {
+                // Check X direction separately
+                const groundBelowX = this.world.getBlock(
+                    Math.floor(player.x + moveX * 0.1),
+                    Math.floor(player.y),
+                    Math.floor(player.z - 0.1)
+                );
+                if (groundBelowX === BLOCKS.AIR || groundBelowX === BLOCKS.WATER) {
+                    moveX = 0;
+                }
+                
+                // Check Y direction separately
+                const groundBelowY = this.world.getBlock(
+                    Math.floor(player.x),
+                    Math.floor(player.y + moveY * 0.1),
+                    Math.floor(player.z - 0.1)
+                );
+                if (groundBelowY === BLOCKS.AIR || groundBelowY === BLOCKS.WATER) {
+                    moveY = 0;
+                }
+            }
+        }
+        
+        player.vx = moveX;
+        player.vy = moveY;
+        
+        // Ladder climbing
+        if (player.isOnLadder) {
+            if (input.isJumping()) {
+                player.vz = player.climbSpeed || 3;
+            } else if (isSneaking) {
+                player.vz = -(player.climbSpeed || 3) * 0.5;
+            }
+        }
+        
+        // Jump (not on ladder)
+        if (input.isJumping() && player.grounded && !player.isOnLadder) {
             player.vz = player.jumpForce;
             player.grounded = false;
             this.audio.play('jump');
         }
         
+        // Swimming up
+        if (player.isInWater && input.isJumping()) {
+            player.vz = 3; // Swim up
+        }
+        
         // Physics
         player.applyPhysics(deltaTime);
+        
+        // Sprinting particles
+        if (!this.sprintParticleTimer) this.sprintParticleTimer = 0;
+        this.sprintParticleTimer -= deltaTime;
+        
+        const isSprinting = input.isSprinting() && (Math.abs(player.vx) > 0.1 || Math.abs(player.vy) > 0.1);
+        if (isSprinting && player.grounded && this.sprintParticleTimer <= 0) {
+            // Get ground block for particle color
+            const groundBlock = this.world.getBlock(
+                Math.floor(player.x),
+                Math.floor(player.y),
+                Math.floor(player.z - 0.1)
+            );
+            if (groundBlock !== BLOCKS.AIR && groundBlock !== BLOCKS.WATER) {
+                this.renderer3d.addSprintParticles(player.x, player.y, player.z, groundBlock);
+                this.sprintParticleTimer = 0.1; // Spawn particles every 100ms while sprinting
+            }
+        }
         
         // Mining cooldown
         if (!this.miningCooldown) this.miningCooldown = 0;
@@ -942,9 +1137,13 @@ class Game3D {
         const progressRatio = this.mining.progress / this.mining.maxProgress;
         this.renderer3d.updateMiningOverlay(x, y, z, progressRatio);
         
-        // Play mining sound periodically
+        // Play mining sound and trigger arm swing periodically
         if (Math.floor(this.mining.progress * 4) !== Math.floor((this.mining.progress - deltaTime) * 4)) {
             this.audio.play('hit');
+            // Trigger arm swing animation
+            if (this.renderer3d.triggerArmSwing) {
+                this.renderer3d.triggerArmSwing();
+            }
         }
         
         // Check if mining complete
@@ -1050,7 +1249,29 @@ class Game3D {
         }
         
         this.player.updateUI();
-        this.audio.play('place');
+        
+        // Notify quest system about block placement
+        if (this.questManager) {
+            this.questManager.onBlockPlaced(blockId);
+        }
+        
+        // Play placement sound based on block type
+        const blockData = BLOCK_DATA[blockId];
+        if (blockData) {
+            if (blockId === BLOCKS.GLASS) {
+                this.audio.play('break'); // Glass clink
+            } else if (blockId === BLOCKS.SAND || blockId === BLOCKS.GRAVEL) {
+                this.audio.play('walk'); // Soft crunch
+            } else if (blockId === BLOCKS.WOOD || blockId === BLOCKS.OAK_PLANKS || blockId === BLOCKS.PLANKS) {
+                this.audio.play('place'); // Wood thunk
+            } else if (blockId === BLOCKS.STONE || blockId === BLOCKS.COBBLESTONE) {
+                this.audio.play('hit'); // Hard placement
+            } else {
+                this.audio.play('place');
+            }
+        } else {
+            this.audio.play('place');
+        }
         return true;
     }
     
@@ -1065,6 +1286,66 @@ class Game3D {
                  p.y > by + 1 - margin ||
                  p.z + p.depth < bz + margin || 
                  p.z > bz + 1 - margin);
+    }
+    
+    /**
+     * Update breath meter UI
+     */
+    updateBreathMeter() {
+        const breathMeter = document.getElementById('breath-meter');
+        const breathBubbles = document.getElementById('breath-bubbles');
+        
+        if (!breathMeter || !breathBubbles || !this.player) return;
+        
+        // Show only when underwater
+        if (this.player.isSwimming && this.player.breath < this.player.maxBreath) {
+            breathMeter.style.display = 'block';
+            
+            // Create bubble display
+            const fullBubbles = Math.floor(this.player.breath);
+            const halfBubble = (this.player.breath % 1) >= 0.5;
+            let bubbleStr = '';
+            
+            for (let i = 0; i < this.player.maxBreath; i++) {
+                if (i < fullBubbles) {
+                    bubbleStr += '🫧';
+                } else if (i === fullBubbles && halfBubble) {
+                    bubbleStr += '○';
+                } else {
+                    bubbleStr += '·';
+                }
+            }
+            
+            breathBubbles.textContent = bubbleStr;
+        } else {
+            breathMeter.style.display = 'none';
+        }
+    }
+    
+    /**
+     * Update time display UI
+     */
+    updateTimeDisplay() {
+        const dayCount = document.getElementById('day-count');
+        const timeClock = document.getElementById('time-clock');
+        
+        if (!dayCount || !timeClock || !this.world) return;
+        
+        // Calculate day number
+        const day = Math.floor(this.world.dayCount || 1);
+        dayCount.textContent = `Day ${day}`;
+        
+        // Calculate time of day as 24h clock
+        // timeOfDay: 0 = midnight, 0.25 = 6am, 0.5 = noon, 0.75 = 6pm
+        const timeOfDay = this.world.timeOfDay || 0;
+        const hours = Math.floor(timeOfDay * 24);
+        const minutes = Math.floor((timeOfDay * 24 - hours) * 60);
+        
+        // Day/night icon
+        const isDay = timeOfDay > 0.25 && timeOfDay < 0.75;
+        const icon = isDay ? '☀️' : '🌙';
+        
+        timeClock.textContent = `${icon} ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
     }
     
     updateBuildMode() {
@@ -1118,6 +1399,113 @@ class Game3D {
             this.renderer3d.updateSelectionBox(hit.x, hit.y, hit.z);
         } else {
             this.renderer3d.updateSelectionBox(null, null, null);
+        }
+        
+        // Update crosshair based on what we're looking at
+        this.updateCrosshairState(hit);
+    }
+    
+    /**
+     * Update crosshair appearance based on target
+     */
+    updateCrosshairState(blockHit) {
+        const crosshair = document.querySelector('.crosshair');
+        if (!crosshair) return;
+        
+        // Reset classes
+        crosshair.classList.remove('interactable', 'hostile');
+        
+        if (blockHit) {
+            const blockData = BLOCK_DATA[blockHit.blockId];
+            if (blockData) {
+                // Check if block is interactable (chest, door, crafting table, etc.)
+                const interactableBlocks = [
+                    BLOCKS.CHEST, BLOCKS.CRAFTING_TABLE, BLOCKS.FURNACE,
+                    BLOCKS.WORKBENCH, BLOCKS.DOOR, BLOCKS.BED,
+                    BLOCKS.ANVIL, BLOCKS.ENCHANTING_TABLE, BLOCKS.BREWING_STAND
+                ];
+                
+                if (interactableBlocks.some(b => b === blockHit.blockId)) {
+                    crosshair.classList.add('interactable');
+                }
+            }
+        }
+        
+        // TODO: Could also check for entities in raycast and add 'hostile' class
+    }
+    
+    /**
+     * Update ambient sounds based on environment
+     */
+    updateAmbientSounds(deltaTime) {
+        if (!this.audio || !this.player) return;
+        
+        // Check if player is in a cave (underground with solid blocks above)
+        const px = Math.floor(this.player.x);
+        const py = Math.floor(this.player.y);
+        const pz = Math.floor(this.player.z);
+        
+        // Check skylight - if blocks above, we're in a cave
+        let isCave = false;
+        for (let z = pz + 2; z < CONFIG.WORLD_HEIGHT; z++) {
+            const block = this.world.getBlock(px, py, z);
+            if (block !== BLOCKS.AIR && block !== BLOCKS.WATER && block !== BLOCKS.LEAVES) {
+                isCave = true;
+                break;
+            }
+        }
+        
+        // Get biome info
+        const biome = this.world.getBiome?.(px, py);
+        const isDay = this.world.timeOfDay > 0.2 && this.world.timeOfDay < 0.8;
+        
+        // Update audio ambience
+        this.audio.updateAmbience?.(biome, isDay, isCave);
+    }
+    
+    /**
+     * Update falling blocks (sand, gravel gravity)
+     */
+    updateFallingBlocks(deltaTime) {
+        if (!this.fallingBlockTimer) this.fallingBlockTimer = 0;
+        this.fallingBlockTimer += deltaTime;
+        
+        // Only check every 0.1 seconds for performance
+        if (this.fallingBlockTimer < 0.1) return;
+        this.fallingBlockTimer = 0;
+        
+        // Check blocks near player
+        const px = Math.floor(this.player.x);
+        const py = Math.floor(this.player.y);
+        const pz = Math.floor(this.player.z);
+        const range = 8;
+        
+        for (let x = px - range; x <= px + range; x++) {
+            for (let y = py - range; y <= py + range; y++) {
+                for (let z = 1; z < CONFIG.WORLD_HEIGHT - 1; z++) {
+                    const block = this.world.getBlock(x, y, z);
+                    const blockData = BLOCK_DATA[block];
+                    
+                    if (blockData?.gravity) {
+                        // Check if air below
+                        const below = this.world.getBlock(x, y, z - 1);
+                        if (below === BLOCKS.AIR || below === BLOCKS.WATER) {
+                            // Fall down
+                            this.world.setBlock(x, y, z, BLOCKS.AIR);
+                            this.world.setBlock(x, y, z - 1, block);
+                            this.markChunkDirty(x, y);
+                            
+                            // Add falling particle effect
+                            this.renderer3d.addParticle(
+                                x + 0.5, y + 0.5, z,
+                                blockData.color || '#888888',
+                                { x: 0, y: 0, z: -2 },
+                                0.3
+                            );
+                        }
+                    }
+                }
+            }
         }
     }
     

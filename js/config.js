@@ -39,6 +39,10 @@ export const CONFIG = {
     // Mining
     BASE_MINING_SPEED: 1,
     MINING_RANGE: 4,
+    
+    // 3D Rendering
+    BLOCK_OUTLINE_SCALE: 1.02, // Selection box size multiplier (1.02 = 2% larger)
+    BLOCK_OUTLINE_COLOR: 0x000000, // Black outline for better visibility
 
     // Combat
     ATTACK_RANGE: 1.5,
@@ -109,6 +113,7 @@ export const BLOCKS = {
     THATCH: 37, // Prehistoric roof material
     MUD_BRICK: 38,
     CAMPFIRE: 39,
+    SLIME_BLOCK: 40, // Bouncy block
     // Stone Age Building Extensions
     THATCH_STAIRS_N: 400, THATCH_STAIRS_S: 401, THATCH_STAIRS_E: 402, THATCH_STAIRS_W: 403,
     THATCH_SLAB: 404,
@@ -386,6 +391,11 @@ export const BLOCK_DATA = {
         name: 'Campfire', solid: false, transparent: true, hardness: 1,
         drops: 'coal', color: '#FF4500', emoji: '🔥',
         lightLevel: 15, damageOnTouch: 1, canCook: true
+    },
+    [BLOCKS.SLIME_BLOCK]: {
+        name: 'Slime Block', solid: true, transparent: true, hardness: 0.5,
+        drops: 'slime_block', color: '#7FFF00', emoji: '🟢',
+        bouncy: true, bounceMultiplier: 1.5
     },
     [BLOCKS.STONE_BRICKS]: {
         name: 'Stone Bricks', solid: true, transparent: false, hardness: 3,

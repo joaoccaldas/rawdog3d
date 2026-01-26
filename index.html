@@ -47,6 +47,7 @@
             position: absolute;
             background: white;
             border: 1px solid black;
+            transition: all 0.1s ease;
         }
         
         .crosshair::before {
@@ -63,6 +64,67 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
+        }
+        
+        /* Crosshair expands when targeting interactable blocks */
+        .crosshair.interactable::before {
+            width: 28px;
+            background: #FFD700;
+        }
+        
+        .crosshair.interactable::after {
+            height: 28px;
+            background: #FFD700;
+        }
+        
+        /* Crosshair turns red for hostile enemies */
+        .crosshair.hostile::before,
+        .crosshair.hostile::after {
+            background: #FF4444;
+        }
+        
+        /* Item Tooltip */
+        #item-tooltip {
+            position: fixed;
+            background: rgba(20, 0, 30, 0.95);
+            border: 2px solid #5555FF;
+            border-radius: 4px;
+            padding: 8px 12px;
+            color: white;
+            font-family: 'Segoe UI', sans-serif;
+            z-index: 1001;
+            pointer-events: none;
+            min-width: 120px;
+        }
+        
+        #item-tooltip .tooltip-name {
+            font-weight: bold;
+            font-size: 14px;
+            color: #88CCFF;
+            margin-bottom: 4px;
+        }
+        
+        #item-tooltip .tooltip-desc {
+            font-size: 12px;
+            color: #AAAAAA;
+        }
+        
+        /* Durability bar on hotbar items */
+        .durability-bar {
+            position: absolute;
+            bottom: 2px;
+            left: 4px;
+            right: 4px;
+            height: 3px;
+            background: #333;
+            border-radius: 1px;
+        }
+        
+        .durability-fill {
+            height: 100%;
+            background: linear-gradient(to right, #00FF00, #FFFF00, #FF0000);
+            border-radius: 1px;
+            transition: width 0.2s;
         }
         
         #pointer-lock-prompt {
@@ -256,16 +318,33 @@
     <!-- Builder Mode Button -->
     <button id="builder-mode-btn-3d">🔧 Builder Mode</button>
     
+    <!-- Breath Meter (underwater) -->
+    <div id="breath-meter" style="display: none;">
+        <span id="breath-bubbles">🫧🫧🫧🫧🫧🫧🫧🫧🫧🫧</span>
+    </div>
+    
     <!-- UI Overlays (same as 2D version) -->
     <div id="hotbar">
-        <div class="hotbar-slot selected" data-slot="0"></div>
-        <div class="hotbar-slot" data-slot="1"></div>
-        <div class="hotbar-slot" data-slot="2"></div>
-        <div class="hotbar-slot" data-slot="3"></div>
-        <div class="hotbar-slot" data-slot="4"></div>
-        <div class="hotbar-slot" data-slot="5"></div>
-        <div class="hotbar-slot" data-slot="6"></div>
-        <div class="hotbar-slot" data-slot="7"></div>
+        <div class="hotbar-slot selected" data-slot="0"><span class="slot-number">1</span></div>
+        <div class="hotbar-slot" data-slot="1"><span class="slot-number">2</span></div>
+        <div class="hotbar-slot" data-slot="2"><span class="slot-number">3</span></div>
+        <div class="hotbar-slot" data-slot="3"><span class="slot-number">4</span></div>
+        <div class="hotbar-slot" data-slot="4"><span class="slot-number">5</span></div>
+        <div class="hotbar-slot" data-slot="5"><span class="slot-number">6</span></div>
+        <div class="hotbar-slot" data-slot="6"><span class="slot-number">7</span></div>
+        <div class="hotbar-slot" data-slot="7"><span class="slot-number">8</span></div>
+    </div>
+    
+    <!-- Item Tooltip -->
+    <div id="item-tooltip" style="display: none;">
+        <div class="tooltip-name"></div>
+        <div class="tooltip-desc"></div>
+    </div>
+    
+    <!-- Time/Day Display -->
+    <div id="time-display">
+        <span id="day-count">Day 1</span>
+        <span id="time-clock">☀️ 12:00</span>
     </div>
     
     <!-- Full HUD (matching 2D version) -->
@@ -368,8 +447,14 @@
         <div class="death-container">
             <h1>💀 YOU DIED</h1>
             <p id="death-message">You were slain</p>
-            <p>Survived <span id="survival-days">0</span> days</p>
-            <button id="respawn-btn">Respawn</button>
+            <div class="death-stats">
+                <p>Survived <span id="survival-days">0</span> days</p>
+                <p>Score: <span id="death-score">0</span></p>
+            </div>
+            <div class="death-buttons">
+                <button id="respawn-btn" class="death-btn">⚔️ Respawn</button>
+                <button id="title-btn" class="death-btn secondary">🏠 Title Screen</button>
+            </div>
         </div>
     </div>
     

@@ -49,6 +49,10 @@ export class Camera3D {
         this.currentPosition = new THREE.Vector3();
         this.smoothSpeed = 8;
         
+        // Swimming bob effect
+        this.swimBobTime = 0;
+        this.swimBobIntensity = 0;
+        
         // Shake effect
         this.shakeIntensity = 0;
         this.shakeDuration = 0;
@@ -226,6 +230,21 @@ export class Camera3D {
         // Three: X=right, Y=up, Z=forward
         const eyeHeight = this.isFirstPerson() ? 1.6 : 1; // Higher eye level in first person
         this.targetPosition.set(player.x, player.z + eyeHeight, player.y);
+        
+        // Swimming bob effect
+        if (player.isInWater) {
+            this.swimBobIntensity = Math.min(this.swimBobIntensity + 2 * deltaTime, 1);
+            this.swimBobTime += deltaTime * 2;
+            
+            // Gentle vertical and horizontal bob
+            const bobY = Math.sin(this.swimBobTime) * 0.1 * this.swimBobIntensity;
+            const bobX = Math.sin(this.swimBobTime * 0.7) * 0.05 * this.swimBobIntensity;
+            
+            this.targetPosition.y += bobY;
+            this.targetPosition.x += bobX;
+        } else {
+            this.swimBobIntensity = Math.max(this.swimBobIntensity - 3 * deltaTime, 0);
+        }
         
         // Smooth follow (faster in first person for responsiveness)
         const followSpeed = this.isFirstPerson() ? 20 : this.smoothSpeed;
