@@ -402,16 +402,17 @@ class Game3D {
             </div>
             <div id="look-area"></div>
             <div id="mobile-action-buttons">
-                <button id="btn-mobile-jump" class="mobile-btn" title="Jump">🦘</button>
-                <button id="btn-mobile-mine" class="mobile-btn" title="Gather">🪨</button>
-                <button id="btn-mobile-place" class="mobile-btn" title="Build">🏠</button>
-                <button id="btn-mobile-inventory" class="mobile-btn" title="Inventory">🎒</button>
-                <button id="btn-mobile-craft" class="mobile-btn" title="Craft">🔥</button>
-                <button id="btn-mobile-menu" class="mobile-btn" title="Menu">🦴</button>
+                <button id="btn-mobile-jump" class="mobile-btn" title="Jump">⬆</button>
+                <button id="btn-mobile-mine" class="mobile-btn" title="Mine">⛏</button>
+                <button id="btn-mobile-place" class="mobile-btn" title="Build">🧱</button>
+                <button id="btn-mobile-inventory" class="mobile-btn" title="Bag">🎒</button>
             </div>
             <div id="mobile-hotbar-nav">
-                <button id="btn-mobile-prev" class="mobile-btn mobile-btn-small" title="Prev">◀</button>
-                <button id="btn-mobile-next" class="mobile-btn mobile-btn-small" title="Next">▶</button>
+                <button id="btn-mobile-prev" class="mobile-btn-small" title="Prev">◀</button>
+                <button id="btn-mobile-next" class="mobile-btn-small" title="Next">▶</button>
+            </div>
+            <div id="mobile-top-buttons">
+                <button id="btn-mobile-menu" class="mobile-btn-mini">☰</button>
             </div>
         `;
         document.body.appendChild(mobileUI);
@@ -431,15 +432,15 @@ class Game3D {
             }
             #joystick-container {
                 position: absolute;
-                bottom: 100px;
-                left: 30px;
+                bottom: 70px;
+                left: 16px;
                 pointer-events: auto;
             }
             #joystick-base {
-                width: 120px;
-                height: 120px;
-                background: rgba(255, 255, 255, 0.2);
-                border: 3px solid rgba(255, 255, 255, 0.5);
+                width: 100px;
+                height: 100px;
+                background: rgba(255, 255, 255, 0.12);
+                border: 2px solid rgba(255, 255, 255, 0.25);
                 border-radius: 50%;
                 display: flex;
                 align-items: center;
@@ -447,9 +448,9 @@ class Game3D {
                 touch-action: none;
             }
             #joystick-stick {
-                width: 50px;
-                height: 50px;
-                background: rgba(255, 255, 255, 0.7);
+                width: 40px;
+                height: 40px;
+                background: rgba(255, 255, 255, 0.5);
                 border-radius: 50%;
                 transition: transform 0.05s;
             }
@@ -464,46 +465,86 @@ class Game3D {
             }
             #mobile-action-buttons {
                 position: absolute;
-                bottom: 100px;
-                right: 20px;
-                display: flex;
-                flex-direction: column;
-                gap: 10px;
+                bottom: 60px;
+                right: 12px;
+                display: grid;
+                grid-template-columns: repeat(2, 52px);
+                gap: 8px;
                 pointer-events: auto;
             }
             .mobile-btn {
-                width: 60px;
-                height: 60px;
+                width: 52px;
+                height: 52px;
                 border-radius: 50%;
-                border: 3px solid #8B4513;
-                background: linear-gradient(145deg, rgba(139,69,19,0.8), rgba(101,67,33,0.9));
+                border: 2px solid rgba(139,69,19,0.8);
+                background: rgba(40,25,15,0.7);
                 color: #ffd700;
-                font-size: 24px;
+                font-size: 20px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 touch-action: manipulation;
                 -webkit-tap-highlight-color: transparent;
-                box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+                backdrop-filter: blur(4px);
+                -webkit-backdrop-filter: blur(4px);
             }
             .mobile-btn:active, .mobile-btn.active {
-                background: linear-gradient(145deg, rgba(255,165,0,0.8), rgba(139,69,19,0.9));
-                transform: scale(0.95);
+                background: rgba(180,100,20,0.7);
+                transform: scale(0.93);
             }
             .mobile-btn-small {
-                width: 40px;
-                height: 40px;
-                font-size: 16px;
+                width: 36px;
+                height: 36px;
+                font-size: 14px;
                 border-radius: 8px;
+                border: 1px solid rgba(255,255,255,0.2);
+                background: rgba(0,0,0,0.4);
+                color: white;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                touch-action: manipulation;
+                -webkit-tap-highlight-color: transparent;
+                pointer-events: auto;
+            }
+            .mobile-btn-small:active {
+                background: rgba(100,80,40,0.6);
+                transform: scale(0.93);
             }
             #mobile-hotbar-nav {
                 position: absolute;
-                bottom: 20px;
+                bottom: 14px;
                 left: 50%;
                 transform: translateX(-50%);
                 display: flex;
-                gap: 8px;
+                gap: 60px;
                 pointer-events: auto;
+            }
+            #mobile-top-buttons {
+                position: absolute;
+                top: 8px;
+                left: 50%;
+                transform: translateX(-50%);
+                display: flex;
+                gap: 6px;
+                pointer-events: auto;
+            }
+            .mobile-btn-mini {
+                width: 32px;
+                height: 32px;
+                border-radius: 6px;
+                border: 1px solid rgba(255,255,255,0.2);
+                background: rgba(0,0,0,0.4);
+                color: white;
+                font-size: 14px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                touch-action: manipulation;
+                -webkit-tap-highlight-color: transparent;
+            }
+            .mobile-btn-mini:active {
+                background: rgba(100,80,40,0.6);
             }
             #game-container {
                 -webkit-user-select: none;
@@ -513,6 +554,9 @@ class Game3D {
             @media (max-width: 1024px) {
                 .crosshair { display: none !important; }
                 #pointer-lock-prompt { display: none !important; }
+                #quest-panel, #side-quest-panel { display: none !important; }
+                #minimap-container { display: none !important; }
+                #builder-mode-btn-3d { display: none !important; }
             }
         `;
         document.head.appendChild(mobileCSS);

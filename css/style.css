@@ -1881,3 +1881,151 @@ body {
     height: 100%;
     image-rendering: pixelated;
 }
+
+/* ============ MOBILE HUD OVERHAUL ============ */
+@media (max-width: 1024px), (pointer: coarse) {
+
+    /* Hide non-essential panels that block the view */
+    #quest-panel,
+    #side-quest-panel,
+    #builder-mode-btn-3d,
+    #minimap-container,
+    #day-cycle,
+    #xp-bar,
+    #temperature-bar,
+    #armor-display,
+    #level-display,
+    #time-display,
+    #buffs-display,
+    #debug-info {
+        display: none !important;
+    }
+
+    /* Compact HUD: health + hunger as thin bars at top-left */
+    #hud {
+        top: 8px !important;
+        left: 8px !important;
+        right: auto !important;
+        bottom: auto !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 3px !important;
+        width: 140px !important;
+        padding: 0 !important;
+        background: none !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    #health-bar,
+    #hunger-bar {
+        width: 140px !important;
+        height: 14px !important;
+        border-width: 1px !important;
+        border-radius: 4px !important;
+        margin: 0 !important;
+    }
+
+    #health-text,
+    #hunger-text {
+        font-size: 9px !important;
+        line-height: 14px !important;
+    }
+
+    /* Compact hotbar at bottom center */
+    #hotbar {
+        bottom: 8px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        padding: 3px !important;
+        gap: 2px !important;
+        border-radius: 8px !important;
+        max-width: 55vw !important;
+        background: rgba(30, 18, 10, 0.75) !important;
+    }
+
+    #hotbar .hotbar-slot {
+        width: 36px !important;
+        height: 36px !important;
+        min-width: 36px !important;
+        font-size: 16px !important;
+        border-width: 2px !important;
+    }
+
+    #hotbar .slot-count {
+        font-size: 8px !important;
+    }
+
+    #hotbar .slot-number {
+        display: none !important;
+    }
+
+    /* Day counter as minimal badge at top-right */
+    #day-count {
+        display: block !important;
+        position: fixed !important;
+        top: 8px !important;
+        right: 8px !important;
+        font-size: 11px !important;
+        background: rgba(0,0,0,0.5) !important;
+        padding: 3px 8px !important;
+        border-radius: 10px !important;
+        color: #f5deb3 !important;
+        z-index: 150 !important;
+        border: 1px solid rgba(139,69,19,0.5) !important;
+    }
+
+    /* Notifications: small toast at top center */
+    .game-notification {
+        top: 40px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        right: auto !important;
+        max-width: 250px !important;
+        font-size: 12px !important;
+        padding: 6px 12px !important;
+        text-align: center !important;
+    }
+
+    /* Pause menu sizing */
+    #pause-menu {
+        width: 85vw !important;
+        max-width: 320px !important;
+    }
+
+    #pause-menu .modal-content {
+        padding: 16px !important;
+    }
+
+    /* Death screen sizing */
+    #death-screen {
+        padding: 20px !important;
+    }
+
+    #death-screen .death-content {
+        width: 85vw !important;
+        max-width: 320px !important;
+    }
+
+    /* Inventory adjustments */
+    #inventory-screen .inventory-container {
+        width: 90vw !important;
+        max-width: 360px !important;
+        padding: 12px !important;
+    }
+
+    #inventory-grid {
+        grid-template-columns: repeat(5, 1fr) !important;
+    }
+
+    #inventory-grid .inventory-slot {
+        width: 45px !important;
+        height: 45px !important;
+    }
+
+    /* Crafting adjustments */
+    #crafting-menu .crafting-container {
+        width: 90vw !important;
+        max-width: 360px !important;
+    }
+}
