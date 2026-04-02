@@ -1322,11 +1322,13 @@ export class Renderer3D {
             if (this.atlasTexture) {
                 material = new THREE.MeshLambertMaterial({
                     map: this.atlasTexture,
-                    vertexColors: true
+                    vertexColors: true,
+                    side: THREE.DoubleSide
                 });
             } else {
                 material = new THREE.MeshLambertMaterial({
-                    vertexColors: true
+                    vertexColors: true,
+                    side: THREE.DoubleSide
                 });
             }
             
