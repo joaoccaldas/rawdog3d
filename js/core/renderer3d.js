@@ -1347,11 +1347,9 @@ export class Renderer3D {
             mesh.castShadow = true;
             mesh.receiveShadow = true;
             
-            // Chunk fade-in animation
-            mesh.userData.fadeIn = true;
-            mesh.userData.fadeProgress = 0;
-            mesh.material.transparent = true;
-            mesh.material.opacity = 0;
+            // Chunks render immediately at full opacity
+            mesh.material.transparent = false;
+            mesh.material.opacity = 1;
             
             this.scene.add(mesh);
             this.chunkMeshes.set(chunkKey, mesh);
