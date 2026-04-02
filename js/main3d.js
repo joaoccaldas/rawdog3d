@@ -1583,20 +1583,39 @@ class Game3D {
     }
     
     rebuildDirtyChunks() {
-        // Limit rebuilds per frame
         let rebuilds = 0;
-        const maxRebuilds = 2;
+        const maxRebuilds = 4;
         
+        // Rebuild chunks modified by block changes
         for (const key of this.dirtyChunks) {
             if (rebuilds >= maxRebuilds) break;
-            
             const chunk = this.world.chunks.get(key);
             if (chunk) {
                 this.renderer3d.buildChunkMesh(chunk);
                 rebuilds++;
             }
-            
             this.dirtyChunks.delete(key);
+        }
+        
+        // Build meshes for any newly generated chunks that don't have a mesh yet
+        for (const [key, chunk] of this.world.chunks) {
+            if (rebuilds >= maxRebuilds * 2) break;
+            if (!this.renderer3d.chunkMeshes.has(key)) {
+                this.renderer3d.buildChunkMesh(chunk);
+                rebuilds++;
+            }
+        }
+        
+        // Remove meshes for chunks that no longer exist (unloaded)
+        for (const key of this.renderer3d.chunkMeshes.keys()) {
+            if (!this.world.chunks.has(key)) {
+                const mesh = this.renderer3d.chunkMeshes.get(key);
+                if (mesh) this.renderer3d.scene.remove(mesh);
+                this.renderer3d.chunkMeshes.delete(key);
+                const water = this.renderer3d.waterMeshes.get(key);
+                if (water) this.renderer3d.scene.remove(water);
+                this.renderer3d.waterMeshes.delete(key);
+            }
         }
     }
     

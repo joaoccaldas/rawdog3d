@@ -775,21 +775,8 @@ export class Renderer3D {
      * Update chunk fade-in animation
      */
     updateChunkFadeIn(deltaTime) {
-        const fadeSpeed = 3; // Chunks fully appear in ~0.3 seconds
-        
-        for (const mesh of this.chunkMeshes.values()) {
-            if (mesh.userData.fadeIn && mesh.userData.fadeProgress < 1) {
-                mesh.userData.fadeProgress += deltaTime * fadeSpeed;
-                
-                if (mesh.userData.fadeProgress >= 1) {
-                    mesh.userData.fadeProgress = 1;
-                    mesh.userData.fadeIn = false;
-                    mesh.material.transparent = false;
-                    mesh.material.opacity = 1;
-                    mesh.material.needsUpdate = true;
-                } else {
-                    mesh.material.opacity = mesh.userData.fadeProgress;
-                }
+        // Fade-in disabled: chunks render at full opacity immediately
+    }
             }
         }
     }
