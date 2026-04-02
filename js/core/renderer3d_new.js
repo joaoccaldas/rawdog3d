@@ -87,7 +87,6 @@ export class Renderer3D {
         // Handle resize
         window.addEventListener('resize', () => this.resize());
         
-        console.log('Renderer3D: Initialized');
     }
     
     setupLighting() {

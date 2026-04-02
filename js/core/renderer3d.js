@@ -152,7 +152,6 @@ export class Renderer3D {
         window.addEventListener('resize', () => this.resize());
         
         this.ready = true;
-        console.log('Renderer3D: Initialized with textures and player model');
     }
     
     setupLighting() {
@@ -296,7 +295,6 @@ export class Renderer3D {
             vertexColors: false // Texture provides all color
         });
         
-        console.log('Renderer3D: Built texture atlas with', atlasIndex, 'textures');
     }
     
     getBlockUVs(blockId, face) {
@@ -1323,7 +1321,6 @@ export class Renderer3D {
         if (positions.length > 0) {
             // Debug: Log vertex count for first few chunks
             if (this.chunkMeshes.size < 5) {
-                console.log(`Renderer3D: Chunk ${chunkKey} has ${positions.length / 3} vertices, ${uvs.length / 2} uvs, atlasTexture: ${!!this.atlasTexture}`);
             }
             
             const geometry = new THREE.BufferGeometry();
@@ -2409,7 +2406,6 @@ export class Renderer3D {
         }
         this.waterMeshes.clear();
         
-        console.log('Renderer3D: Cleared all chunk meshes');
     }
     
     /**

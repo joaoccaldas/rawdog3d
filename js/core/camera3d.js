@@ -82,7 +82,6 @@ export class Camera3D {
             this.game.ui.showNotification(mode.name);
         }
         
-        console.log('Camera view mode:', mode.name);
     }
     
     /**
@@ -132,7 +131,6 @@ export class Camera3D {
             const lockedElement = document.pointerLockElement;
             this.isLocked = lockedElement === this.canvas || 
                            (lockedElement && lockedElement.id === 'game-canvas-3d');
-            console.log('Camera3D: Pointer lock changed, isLocked:', this.isLocked);
         });
         
         document.addEventListener('mousemove', (e) => {
@@ -149,7 +147,6 @@ export class Camera3D {
         // Handle resize
         window.addEventListener('resize', () => this.resize());
         
-        console.log('Camera3D: Initialized');
     }
     
     onMouseMove(event) {
@@ -379,9 +376,6 @@ export class Camera3D {
         
         // Debug logging (reduced frequency)
         if (Math.random() < 0.02) { // Only log 2% of calls
-            console.log('getTargetBlock: player world pos=', player.x.toFixed(1), player.y.toFixed(1), player.z.toFixed(1));
-            console.log('  ray origin (three.js)=', origin.toArray().map(v => v.toFixed(2)));
-            console.log('  ray dir=', direction.toArray().map(v => v.toFixed(2)));
         }
         
         // Step along ray to find block
@@ -399,7 +393,6 @@ export class Camera3D {
             const block = this.game.world?.getBlock(wx, wy, wz);
             
             if (block !== undefined && block !== 0 && block !== 5) { // Not air or water
-                console.log('getTargetBlock FOUND:', block, 'at world', wx, wy, wz, 't=', t.toFixed(2));
                 
                 // Calculate face hit based on entry direction
                 const localX = point.x - wx;

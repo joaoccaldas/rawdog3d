@@ -131,7 +131,6 @@ export class MusicSystem {
             this.masterGain.gain.value = this.masterVolume;
             
             this.initialized = true;
-            console.log('Music system initialized');
             
         } catch (error) {
             console.error('Failed to initialize music system:', error);

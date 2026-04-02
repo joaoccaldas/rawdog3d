@@ -288,7 +288,6 @@ export class SeasonalEventsSystem {
             5000
         );
         
-        console.log(`Event started: ${event.name}`);
     }
     
     // End current event

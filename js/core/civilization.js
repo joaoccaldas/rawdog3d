@@ -279,7 +279,6 @@ export class CivilizationManager {
     }
     
     init() {
-        console.log('CivilizationManager: Initializing...');
         
         // Create initial settlement at player spawn
         if (this.game.player) {
@@ -287,7 +286,6 @@ export class CivilizationManager {
             this.createSettlement('Home Village', spawn.x, spawn.y);
         }
         
-        console.log('CivilizationManager: Initialized');
     }
     
     createSettlement(name, x, y) {
@@ -304,7 +302,6 @@ export class CivilizationManager {
             this.spawnVillager(settlement);
         }
         
-        console.log(`CivilizationManager: Created settlement "${name}" at ${x}, ${y}`);
         return settlement;
     }
     
@@ -335,7 +332,6 @@ export class CivilizationManager {
         settlement.villagers.push(villager);
         this.totalPopulation++;
         
-        console.log(`CivilizationManager: Spawned villager "${villager.name}" at settlement "${settlement.name}"`);
         return villager;
     }
     
@@ -539,7 +535,6 @@ export class CivilizationManager {
         this.unlockedTechnologies.add(techId);
         
         this.game.ui?.showMessage(`Technology unlocked: ${tech.name}!`, 'success');
-        console.log(`CivilizationManager: Unlocked technology "${tech.name}"`);
         
         return true;
     }

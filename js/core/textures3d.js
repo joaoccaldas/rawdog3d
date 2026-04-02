@@ -110,12 +110,10 @@ export class TextureManager3D {
     }
 
     async init() {
-        console.log('TextureManager3D: Initializing...');
         
         // Generate procedural textures for all blocks
         this.generateAllTextures();
         
-        console.log('TextureManager3D: Generated', this.textures.size, 'textures');
         return true;
     }
 

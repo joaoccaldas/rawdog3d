@@ -541,7 +541,6 @@ export class VehicleSystem {
     }
 
     init() {
-        console.log('Vehicle System initialized');
     }
 
     update(deltaTime) {
@@ -555,7 +554,6 @@ export class VehicleSystem {
         this.vehicles.push(vehicle);
         this.game.entities.push(vehicle);
         
-        console.log(`Spawned ${vehicle.type.name} at (${x}, ${y}, ${z})`);
         return vehicle;
     }
 

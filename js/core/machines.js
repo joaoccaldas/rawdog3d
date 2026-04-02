@@ -473,7 +473,6 @@ export class MachineSystem {
     }
 
     init() {
-        console.log('Machine System initialized');
     }
 
     update(deltaTime) {
@@ -505,7 +504,6 @@ export class MachineSystem {
         // Connect to power network
         this.connectToNetwork(machine);
         
-        console.log(`Added ${machine.type.name} at (${x}, ${y}, ${z})`);
         return machine;
     }
 
@@ -526,7 +524,6 @@ export class MachineSystem {
             }
             
             this.machines.delete(key);
-            console.log(`Removed machine at (${x}, ${y}, ${z})`);
             return true;
         }
         return false;

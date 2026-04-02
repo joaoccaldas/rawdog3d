@@ -1028,6 +1028,21 @@ body {
     }
 }
 
+@media (max-width: 1024px), (pointer: coarse) {
+    #mobile-controls { display: flex !important; }
+
+    #mobile-controls button:active {
+        transform: scale(0.9);
+        filter: brightness(1.3);
+    }
+}
+
+#game-container {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
 /* Modal Styles - Stone Age Theme */
 .modal {
     position: fixed;

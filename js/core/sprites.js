@@ -39,7 +39,6 @@ export class SpriteManager {
         await this.loadEnemySprites();
 
         this.spritesLoaded = true;
-        console.log('Sprites Generated and Loaded');
     }
     
     async loadGrassBlockSprite() {
@@ -47,7 +46,6 @@ export class SpriteManager {
             this.grassBlockSprite = new Image();
             this.grassBlockSprite.onload = () => {
                 this.grassBlockLoaded = true;
-                console.log('Grass block sprite loaded successfully');
                 resolve();
             };
             this.grassBlockSprite.onerror = () => {
@@ -64,7 +62,6 @@ export class SpriteManager {
             this.blockAtlas = new Image();
             this.blockAtlas.onload = () => {
                 this.blockAtlasLoaded = true;
-                console.log('Block atlas loaded successfully');
                 resolve();
             };
             this.blockAtlas.onerror = () => {
@@ -1149,7 +1146,6 @@ export class SpriteManager {
         this.playerSprites.set('walk2', mainSprite);
         this.playerSprites.set('attack', mainSprite);
         
-        console.log('Player sprites loaded');
     }
 
     getPlayerSprite(state = 'idle', frame = 0) {
@@ -1180,7 +1176,6 @@ export class SpriteManager {
         });
         
         await Promise.all(loadPromises);
-        console.log(`Loaded ${this.enemySprites.size} enemy sprites`);
     }
     
     getEnemySprite(spriteName) {

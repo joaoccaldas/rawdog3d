@@ -67,7 +67,6 @@ export class Input3D {
             this.initMobileControls();
         }
         
-        console.log('Input3D: Initialized');
     }
     
     detectMobile() {
@@ -84,36 +83,86 @@ export class Input3D {
         // Virtual joystick for movement
         const joystickBase = document.getElementById('joystick-base');
         const joystickStick = document.getElementById('joystick-stick');
-        
+
         if (joystickBase && joystickStick) {
             this.setupJoystick(joystickBase, joystickStick);
         }
-        
-        // Action buttons
-        this.setupMobileButton('btn-mine', 
-            () => this.actions.mine = true,
-            () => this.actions.mine = false
-        );
-        
-        this.setupMobileButton('btn-use',
-            () => this.actions.use = true,
-            () => this.actions.use = false
-        );
-        
-        this.setupMobileButton('btn-jump',
+
+        // Jump button
+        this.setupMobileButton('mobile-jump-btn',
             () => this.actions.jump = true,
             () => this.actions.jump = false
         );
-        
-        this.setupMobileButton('btn-attack',
-            () => this.actions.attack = true,
-            () => this.actions.attack = false
+
+        // Attack button (simulate left click / mine)
+        this.setupMobileButton('mobile-attack-btn',
+            () => {
+                this.mouse.leftDown = true;
+                this.actions.mine = true;
+                this.actions.attack = true;
+            },
+            () => {
+                this.mouse.leftDown = false;
+                this.actions.mine = false;
+                this.actions.attack = false;
+            }
         );
-        
-        this.setupMobileButton('btn-inventory',
+
+        // Place button (simulate right click / use)
+        this.setupMobileButton('mobile-place-btn',
+            () => {
+                this.mouse.rightDown = true;
+                this.actions.use = true;
+            },
+            () => {
+                this.mouse.rightDown = false;
+                this.actions.use = false;
+            }
+        );
+
+        // Hotbar slot cycling
+        this.setupMobileButton('mobile-prev-slot',
+            () => {
+                const player = this.game.player;
+                if (player) {
+                    const current = player.selectedSlot ?? 0;
+                    player.selectHotbarSlot((current + 7) % 8);
+                }
+            },
+            () => {}
+        );
+
+        this.setupMobileButton('mobile-next-slot',
+            () => {
+                const player = this.game.player;
+                if (player) {
+                    const current = player.selectedSlot ?? 0;
+                    player.selectHotbarSlot((current + 1) % 8);
+                }
+            },
+            () => {}
+        );
+
+        // Inventory toggle
+        this.setupMobileButton('mobile-inventory-btn',
             () => this.game.ui?.toggleInventory(),
             () => {}
         );
+
+        // Menu / pause toggle
+        this.setupMobileButton('mobile-menu-btn',
+            () => {
+                this.game.menuRequested = true;
+                if (document.pointerLockElement) {
+                    document.exitPointerLock();
+                }
+                this.game.togglePause?.();
+            },
+            () => {}
+        );
+
+        // Touch-to-look camera controls
+        this.setupTouchLook();
     }
     
     setupJoystick(base, stick) {
@@ -204,9 +253,56 @@ export class Input3D {
         });
     }
     
+    setupTouchLook() {
+        const canvas = document.getElementById('game-canvas-3d') || document.querySelector('canvas');
+        if (!canvas) return;
+
+        let lastTouchX = 0;
+        let lastTouchY = 0;
+        let lookTouchId = null;
+        const lookSensitivity = 0.3;
+
+        canvas.addEventListener('touchstart', (e) => {
+            for (const touch of e.changedTouches) {
+                if (touch.clientX > window.innerWidth * 0.4 && lookTouchId === null) {
+                    lookTouchId = touch.identifier;
+                    lastTouchX = touch.clientX;
+                    lastTouchY = touch.clientY;
+                }
+            }
+        }, { passive: true });
+
+        canvas.addEventListener('touchmove', (e) => {
+            for (const touch of e.changedTouches) {
+                if (touch.identifier === lookTouchId) {
+                    const dx = touch.clientX - lastTouchX;
+                    const dy = touch.clientY - lastTouchY;
+
+                    const cam = this.game.camera3d;
+                    if (cam) {
+                        cam.yaw -= dx * lookSensitivity * cam.sensitivity;
+                        cam.pitch -= dy * lookSensitivity * cam.sensitivity;
+                        cam.pitch = Math.max(cam.minPitch, Math.min(cam.maxPitch, cam.pitch));
+                    }
+
+                    lastTouchX = touch.clientX;
+                    lastTouchY = touch.clientY;
+                }
+            }
+        }, { passive: true });
+
+        canvas.addEventListener('touchend', (e) => {
+            for (const touch of e.changedTouches) {
+                if (touch.identifier === lookTouchId) {
+                    lookTouchId = null;
+                }
+            }
+        }, { passive: true });
+    }
+
     onKeyDown(e) {
         this.keys[e.code] = true;
-        
+
         // Prevent default for game keys
         if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'Tab', 'KeyE'].includes(e.code)) {
             e.preventDefault();
@@ -320,7 +416,6 @@ export class Input3D {
         const isLocked = document.pointerLockElement !== null;
         
         if (isLocked) {
-            console.log('Input3D: Mouse down (locked), button:', e.button);
             
             // Handle build mode
             if (this.game.buildMode?.active) {
@@ -346,7 +441,6 @@ export class Input3D {
                     break;
             }
         } else {
-            console.log('Input3D: Mouse down ignored (not locked)');
         }
     }
     

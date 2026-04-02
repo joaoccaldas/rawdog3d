@@ -125,13 +125,11 @@ class Game3D {
     }
     
     async initAsync() {
-        console.log('Game3D: Initializing...');
         
         // World first (generates terrain)
         this.world = new World(this);
         
         // Generate initial chunks around spawn (0,0) before player exists
-        console.log('Game3D: Generating initial chunks around spawn...');
         this.world.generateInitialChunks(8, 8);
         
         // 3D Renderer
@@ -166,11 +164,8 @@ class Game3D {
         this.initFeatureSystems();
         
         // Build initial chunk meshes after renderer is ready
-        console.log('Game3D: Waiting for renderer to initialize...');
         await this.waitForRenderer();
         
-        console.log('Game3D: Building initial chunk meshes...');
-        console.log('Game3D: Chunks loaded:', this.world.chunks.size);
         this.buildInitialMeshes();
         
         // Snap camera to player position
@@ -196,7 +191,6 @@ class Game3D {
         // Start game loop
         requestAnimationFrame((t) => this.gameLoop(t));
         
-        console.log('Game3D: Initialized, player at', this.player.x, this.player.y, this.player.z);
         
         // Expose debug functions globally
         window.debugGame = {
@@ -210,7 +204,6 @@ class Game3D {
             }),
             testMine: () => this.tryMine3D()
         };
-        console.log('Game3D: Debug functions available via window.debugGame');
     }
     
     setupPointerLock() {
@@ -270,12 +263,6 @@ class Game3D {
         // Handle pointer lock change
         document.addEventListener('pointerlockchange', () => {
             const lockedElement = document.pointerLockElement;
-            console.log('Game3D: Pointer lock changed:', {
-                lockedElement: lockedElement?.id || lockedElement?.tagName || 'null',
-                expectedCanvas: canvas?.id || canvas?.tagName,
-                matches: lockedElement === canvas
-            });
-            
             // Check if ANY element is locked (more permissive check)
             if (lockedElement) {
                 // Pointer is locked - start playing
@@ -283,7 +270,6 @@ class Game3D {
                 this.menuRequested = false;
                 if (prompt) prompt.style.display = 'none';
                 if (pauseMenu) pauseMenu.classList.add('hidden');
-                console.log('Game3D: Pointer locked, game unpaused, paused =', this.paused);
             } else {
                 // Pointer is unlocked
                 this.paused = true;
@@ -294,12 +280,10 @@ class Game3D {
                     if (prompt) prompt.style.display = 'none';
                     // Update quest info in pause menu
                     this.updatePauseMenuQuests();
-                    console.log('Game3D: Showing pause menu');
                 } else {
                     // Pointer lock lost for other reason (click outside, etc)
                     // Just show the "click to play" prompt, not the pause menu
                     if (prompt) prompt.style.display = 'block';
-                    console.log('Game3D: Pointer unlocked, showing play prompt');
                 }
             }
         });
@@ -406,7 +390,6 @@ class Game3D {
     }
     
     setupMobileControls() {
-        console.log('Game3D: Setting up mobile controls');
         
         // Create mobile UI elements with prehistoric theme
         const mobileUI = document.createElement('div');
@@ -848,9 +831,7 @@ class Game3D {
         for (const [key, chunk] of this.world.chunks) {
             const mesh = this.renderer3d.buildChunkMesh(chunk);
             if (mesh) meshCount++;
-            console.log(`Game3D: Built mesh for chunk ${key}, has geometry: ${mesh !== null}`);
         }
-        console.log(`Game3D: Built ${meshCount} chunk meshes total`);
     }
     
     gameLoop(timestamp) {
@@ -871,7 +852,6 @@ class Game3D {
         if (!this._lastPausedLog) this._lastPausedLog = 0;
         this._lastPausedLog += deltaTime;
         if (this._lastPausedLog > 2) {
-            console.log('Game3D loop: paused =', this.paused, ', pointerLocked =', !!document.pointerLockElement);
             this._lastPausedLog = 0;
         }
         
@@ -1062,13 +1042,11 @@ class Game3D {
         if (!this._lastMiningLog) this._lastMiningLog = 0;
         this._lastMiningLog += deltaTime;
         if (this._lastMiningLog > 1 && (mining || using)) {
-            console.log('Mining state:', { mining, using, miningCooldown: this.miningCooldown, placingCooldown: this.placingCooldown });
             this._lastMiningLog = 0;
         }
         
         // Mining/Placing with cooldown
         if (mining && this.miningCooldown <= 0) {
-            console.log('Attempting to mine...');
             if (this.tryMine3D()) {
                 this.miningCooldown = 0.25; // 250ms cooldown
             }
@@ -1149,7 +1127,6 @@ class Game3D {
         // Check if mining complete
         if (this.mining.progress >= this.mining.maxProgress) {
             // Block broken!
-            console.log('Block broken:', blockId, 'at', x, y, z);
             
             // Add break particles
             this.renderer3d.addBlockBreakParticles(x, y, z, blockId);
@@ -1731,14 +1708,12 @@ class Game3D {
         this.paused = false;
         this.player.updateUI();
         
-        console.log('Game3D: New game started');
     }
     
     giveBuilderItems() {
         if (!this.player) return;
         
         this.builderMode = true;
-        console.log('Game3D: Builder mode activated');
         
         // God mode
         this.player.health = 9999;

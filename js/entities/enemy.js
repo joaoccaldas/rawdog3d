@@ -263,7 +263,7 @@ export class Enemy extends Entity {
         // Let's copy-paste simplified version
         const dt = Math.min(deltaTime, 0.1);
 
-        this.vz -= CONFIG.GRAVITY * dt * 60; // Scale gravity for deltaTime
+        this.vz -= CONFIG.GRAVITY * dt * 16;
 
         const nextX = this.x + this.vx * dt;
         const nextY = this.y + this.vy * dt;

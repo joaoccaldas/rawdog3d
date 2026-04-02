@@ -58,7 +58,6 @@ export class SaveManager {
         while (currentVersion < this.saveVersion) {
             const migrator = this.migrations[currentVersion];
             if (migrator) {
-                console.log(`Migrating save from v${currentVersion} to v${currentVersion + 1}`);
                 data = migrator(data);
                 currentVersion++;
                 data.version = currentVersion;
@@ -127,7 +126,6 @@ export class SaveManager {
         if (backup) {
             try {
                 const data = JSON.parse(backup);
-                console.log(`Recovering from backup: ${key}`);
                 return data;
             } catch (e) {
                 console.error('Backup corrupted:', e);
@@ -239,7 +237,6 @@ export class SaveManager {
             // LocalStorage has 5MB limit. Full chunks might blow it.
             const saveString = JSON.stringify(data);
             localStorage.setItem(this.currentSlot, saveString);
-            console.log(`Game Saved to ${this.currentSlot} (${(saveString.length / 1024).toFixed(1)} KB)`);
             this.showNotification('Game Saved (Backup Created)');
         } catch (e) {
             console.error('Save failed', e);
@@ -254,7 +251,6 @@ export class SaveManager {
         
         // Try to recover from backup if main save is missing or corrupted
         if (!json) {
-            console.log('No save found, checking backups...');
             for (let i = 0; i < 3; i++) {
                 const backupData = this.recoverFromBackup(i);
                 if (backupData) {
@@ -417,7 +413,6 @@ export class SaveManager {
             
             // ====== REBUILD 3D MESHES IF IN 3D MODE ======
             if (this.game.is3D && this.game.renderer3d) {
-                console.log('Rebuilding 3D chunk meshes after load...');
                 // Clear existing meshes
                 this.game.renderer3d.clearAllChunkMeshes();
                 // Mark all loaded chunks as dirty
@@ -430,7 +425,6 @@ export class SaveManager {
                 }
             }
 
-            console.log('Game Loaded');
             return true;
         } catch (e) {
             console.error('Load failed', e);
@@ -442,7 +436,6 @@ export class SaveManager {
     deleteSave(slot = null) {
         const slotToDelete = slot || this.currentSlot;
         localStorage.removeItem(slotToDelete);
-        console.log(`Deleted save: ${slotToDelete}`);
     }
 
     // Check if save exists

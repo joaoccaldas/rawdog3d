@@ -666,7 +666,6 @@ export class CircuitSystem {
     }
 
     init() {
-        console.log('Circuit System initialized');
     }
 
     update(deltaTime) {
@@ -701,7 +700,6 @@ export class CircuitSystem {
         // Auto-connect to adjacent components
         this.connectToNeighbors(component);
         
-        console.log(`Added ${component.type.name} at (${x}, ${y}, ${z})`);
         return component;
     }
 
@@ -736,7 +734,6 @@ export class CircuitSystem {
         const computer = new Computer(this.game, x, y, z);
         this.computers.set(key, computer);
         
-        console.log(`Added computer at (${x}, ${y}, ${z})`);
         return computer;
     }
 

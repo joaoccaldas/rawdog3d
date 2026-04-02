@@ -97,6 +97,12 @@ export class World {
         this.humidityNoise.seed = Math.random();
         this.temperatureNoise.seed = Math.random();
 
+        // Cave noise layers for dual-octave carving
+        this.caveNoise = new Noise();
+        this.caveNoise.seed = Math.random();
+        this.caveNoise2 = new Noise();
+        this.caveNoise2.seed = Math.random();
+
         // Relic positions for Eternal Flame quest
         this.relicPositions = [
             { id: 'relic_flint', x: 200, y: 150, z: 0, spawned: false },
@@ -128,7 +134,6 @@ export class World {
         const centerChunkY = Math.floor(worldY / CONFIG.CHUNK_SIZE);
         const renderDist = CONFIG.RENDER_DISTANCE || 3;
         
-        console.log(`World: Generating initial chunks around (${centerChunkX}, ${centerChunkY}), distance ${renderDist}`);
         
         for (let x = centerChunkX - renderDist; x <= centerChunkX + renderDist; x++) {
             for (let y = centerChunkY - renderDist; y <= centerChunkY + renderDist; y++) {
@@ -138,7 +143,6 @@ export class World {
             }
         }
         
-        console.log(`World: Generated ${this.chunks.size} chunks`);
     }
 
     loadSerializedChunks(serializedChunks) {
@@ -374,7 +378,6 @@ export class World {
             }
         }
 
-        console.log(`Ancient Cave spawned at ${cx}, ${cy}, ${z}`);
     }
 
     randomTick() {
@@ -643,6 +646,7 @@ export class World {
                 // Floor limit
                 height = Math.max(1, Math.min(height, CONFIG.WORLD_HEIGHT - 5));
 
+                // Pass 1: Fill base terrain
                 for (let z = 0; z < CONFIG.WORLD_HEIGHT; z++) {
                     let block = BLOCKS.AIR;
 
@@ -651,57 +655,14 @@ export class World {
                     } else if (z < height) {
                         block = BLOCKS.STONE;
 
-                        // Sub-surface layers based on biome
                         if (z >= height - 3) {
                             block = biome === BIOMES.SWAMP ? BLOCKS.CLAY : BLOCKS.DIRT;
                         }
 
-                        // Ore generation
-                        if (z >= height - 8 && z < height - 2) {
-                            const oreNoise = this.noise.perlin3(wx * 0.15, wy * 0.15, z * 0.15);
-                            if (oreNoise > 0.6) block = BLOCKS.COAL_ORE;
+                        if (z < height && z >= height - 3 && biome === BIOMES.DESERT) {
+                            block = BLOCKS.SAND;
                         }
-                        if (z >= 5 && z < height - 6) {
-                            const oreNoise = this.noise.perlin3(wx * 0.12, wy * 0.12, z * 0.12);
-                            if (oreNoise > 0.7) block = BLOCKS.IRON_ORE;
-                        }
-                        // Copper ore - common, similar to iron depth
-                        if (z >= 4 && z < height - 5) {
-                            const oreNoise = this.noise.perlin3(wx * 0.13, wy * 0.13, z * 0.13);
-                            if (oreNoise > 0.68 && oreNoise < 0.73) block = BLOCKS.COPPER_ORE;
-                        }
-                        // Tin ore - slightly rarer than copper
-                        if (z >= 3 && z < height - 8) {
-                            const oreNoise = this.noise.perlin3(wx * 0.11, wy * 0.11, z * 0.11);
-                            if (oreNoise > 0.72 && oreNoise < 0.76) block = BLOCKS.TIN_ORE;
-                        }
-                        // Gold deeper
-                        if (z >= 3 && z < height - 10) {
-                            const oreNoise = this.noise.perlin3(wx * 0.1, wy * 0.1, z * 0.1);
-                            if (oreNoise > 0.75) block = BLOCKS.GOLD_ORE;
-                        }
-                        // Diamonds very deep
-                        if (z >= 1 && z < 12) {
-                            const oreNoise = this.noise.perlin3(wx * 0.08, wy * 0.08, z * 0.08);
-                            if (oreNoise > 0.82) block = BLOCKS.DIAMOND_ORE;
-                        }
-
-                        // Gravel pockets
-                        if (z >= height - 6 && z < height - 2) {
-                            const gravelNoise = this.noise.perlin3(wx * 0.2, wy * 0.2, z * 0.2);
-                            if (gravelNoise > 0.65) block = BLOCKS.GRAVEL;
-                        }
-
-                        // Cave generation (Tweaked for better connectivity)
-                        // Lower frequency = larger, smoother caves
-                        const caveNoise = this.noise.perlin3(wx * 0.05, wy * 0.05, z * 0.1);
-                        // Threshold 0.5 -> 0.6 makes caves slightly less common but larger due to freq
-                        if (caveNoise > 0.5 && z > 3 && z < height - 2) {
-                            block = BLOCKS.AIR;
-                        }
-
                     } else if (z === height) {
-                        // Surface block based on biome
                         if (biome === BIOMES.DESERT) {
                             block = BLOCKS.SAND;
                         } else if (biome === BIOMES.SNOW) {
@@ -712,19 +673,73 @@ export class World {
                             block = BLOCKS.GRASS;
                         }
                     } else if (z > height && z <= CONFIG.SEA_LEVEL) {
-                        // Water
                         block = BLOCKS.WATER;
                         if (biome === BIOMES.SNOW && z === CONFIG.SEA_LEVEL) {
                             block = BLOCKS.ICE;
                         }
                     }
 
-                    // Desert sand depth
-                    if (z < height && z >= height - 3 && biome === BIOMES.DESERT) {
-                        block = BLOCKS.SAND;
+                    chunk.setBlock(x, y, z, block);
+                }
+
+                // Pass 2: Ore veins (only replace STONE)
+                for (let z = 1; z < height; z++) {
+                    if (chunk.getBlock(x, y, z) !== BLOCKS.STONE) continue;
+
+                    // Coal: shallow, common
+                    if (z >= 5 && z < height - 3) {
+                        const n = this.noise.perlin3(wx * 0.15, wy * 0.15, z * 0.15);
+                        if (n > 0.6) { chunk.setBlock(x, y, z, BLOCKS.COAL_ORE); continue; }
                     }
 
-                    chunk.setBlock(x, y, z, block);
+                    // Copper: medium depth, fairly common
+                    if (z >= 5 && z < 25) {
+                        const n = this.noise.perlin3(wx * 0.13 + 100, wy * 0.13 + 100, z * 0.13);
+                        if (n > 0.68 && n < 0.73) { chunk.setBlock(x, y, z, BLOCKS.COPPER_ORE); continue; }
+                    }
+
+                    // Iron: medium depth
+                    if (z >= 3 && z < 20) {
+                        const n = this.noise.perlin3(wx * 0.12 + 200, wy * 0.12 + 200, z * 0.12);
+                        if (n > 0.7) { chunk.setBlock(x, y, z, BLOCKS.IRON_ORE); continue; }
+                    }
+
+                    // Tin: slightly rarer than copper
+                    if (z >= 3 && z < 20) {
+                        const n = this.noise.perlin3(wx * 0.11 + 300, wy * 0.11 + 300, z * 0.11);
+                        if (n > 0.72 && n < 0.76) { chunk.setBlock(x, y, z, BLOCKS.TIN_ORE); continue; }
+                    }
+
+                    // Gold: deep, rare
+                    if (z >= 2 && z < 15) {
+                        const n = this.noise.perlin3(wx * 0.1 + 400, wy * 0.1 + 400, z * 0.1);
+                        if (n > 0.75) { chunk.setBlock(x, y, z, BLOCKS.GOLD_ORE); continue; }
+                    }
+
+                    // Diamond: very deep, very rare
+                    if (z >= 1 && z < 10) {
+                        const n = this.noise.perlin3(wx * 0.08 + 500, wy * 0.08 + 500, z * 0.08);
+                        if (n > 0.82) { chunk.setBlock(x, y, z, BLOCKS.DIAMOND_ORE); continue; }
+                    }
+
+                    // Gravel pockets near surface
+                    if (z >= height - 6 && z < height - 2) {
+                        const n = this.noise.perlin3(wx * 0.2, wy * 0.2, z * 0.2);
+                        if (n > 0.65) { chunk.setBlock(x, y, z, BLOCKS.GRAVEL); continue; }
+                    }
+                }
+
+                // Pass 3: Cave carving with dual-noise
+                for (let z = 2; z < height - 2; z++) {
+                    const currentBlock = chunk.getBlock(x, y, z);
+                    if (currentBlock === BLOCKS.AIR || currentBlock === BLOCKS.BEDROCK) continue;
+
+                    const cv1 = this.caveNoise.perlin3(wx * 0.05, wy * 0.05, z * 0.08);
+                    const cv2 = this.caveNoise2.perlin3(wx * 0.03, wy * 0.03, z * 0.05);
+
+                    if ((cv1 * cv2) > 0.02) {
+                        chunk.setBlock(x, y, z, BLOCKS.AIR);
+                    }
                 }
 
                 // Tree generation based on biome
@@ -816,53 +831,139 @@ export class World {
     }
 
     generateTree(chunk, x, y, groundHeight, biome) {
-        // Tree parameters based on biome object
         const isSnow = biome === BIOMES.SNOW;
         const isJungle = biome === BIOMES.JUNGLE;
-
-        let trunkHeight, leafRadius, leafStart;
+        const isSavanna = biome === BIOMES.SAVANNA;
 
         if (isSnow) {
-            trunkHeight = 4 + Math.floor(Math.random() * 2);
-            leafRadius = 1;
-            leafStart = trunkHeight - 2;
+            this.generatePineTree(chunk, x, y, groundHeight);
         } else if (isJungle) {
-            trunkHeight = 6 + Math.floor(Math.random() * 4); // Tall jungle trees
-            leafRadius = 3;
-            leafStart = trunkHeight - 3;
+            this.generateJungleTree(chunk, x, y, groundHeight);
+        } else if (isSavanna) {
+            this.generateAcaciaTree(chunk, x, y, groundHeight);
         } else {
-            trunkHeight = 3 + Math.floor(Math.random() * 3);
-            leafRadius = 2;
-            leafStart = trunkHeight - 2;
+            this.generateOakTree(chunk, x, y, groundHeight);
         }
+    }
 
-        // Generate trunk
+    placeLeaf(chunk, lx, ly, lz) {
+        if (lx >= 0 && lx < CONFIG.CHUNK_SIZE &&
+            ly >= 0 && ly < CONFIG.CHUNK_SIZE &&
+            lz > 0 && lz < CONFIG.WORLD_HEIGHT) {
+            if (chunk.getBlock(lx, ly, lz) === BLOCKS.AIR) {
+                chunk.setBlock(lx, ly, lz, BLOCKS.LEAVES);
+            }
+        }
+    }
+
+    generateOakTree(chunk, x, y, groundHeight) {
+        const trunkHeight = 4 + Math.floor(Math.random() * 3);
+        const leafRadius = 2;
+
         for (let z = 1; z <= trunkHeight; z++) {
             chunk.setBlock(x, y, groundHeight + z, BLOCKS.WOOD);
         }
 
-        // Generate leaves (sphere-ish canopy)
-        for (let lz = leafStart; lz <= trunkHeight + 1; lz++) {
-            const layerRadius = lz === trunkHeight + 1 ? leafRadius - 1 : leafRadius;
-            for (let lx = -layerRadius; lx <= layerRadius; lx++) {
-                for (let ly = -layerRadius; ly <= layerRadius; ly++) {
-                    // Skip corners for more natural shape
-                    if (Math.abs(lx) === layerRadius && Math.abs(ly) === layerRadius) continue;
-                    // Skip trunk position except for top
+        for (let lz = trunkHeight - 2; lz <= trunkHeight + 1; lz++) {
+            const r = lz === trunkHeight + 1 ? leafRadius - 1 : leafRadius;
+            for (let lx = -r; lx <= r; lx++) {
+                for (let ly = -r; ly <= r; ly++) {
+                    if (Math.abs(lx) === r && Math.abs(ly) === r) continue;
                     if (lx === 0 && ly === 0 && lz < trunkHeight) continue;
+                    this.placeLeaf(chunk, x + lx, y + ly, groundHeight + lz);
+                }
+            }
+        }
+    }
 
-                    const leafX = x + lx;
-                    const leafY = y + ly;
-                    const leafZ = groundHeight + lz;
+    generatePineTree(chunk, x, y, groundHeight) {
+        const trunkHeight = 5 + Math.floor(Math.random() * 3);
 
-                    // Only place if within chunk bounds and position is air
-                    if (leafX >= 0 && leafX < CONFIG.CHUNK_SIZE &&
-                        leafY >= 0 && leafY < CONFIG.CHUNK_SIZE &&
-                        leafZ < CONFIG.WORLD_HEIGHT) {
-                        if (chunk.getBlock(leafX, leafY, leafZ) === BLOCKS.AIR) {
-                            chunk.setBlock(leafX, leafY, leafZ, BLOCKS.LEAVES);
-                        }
+        for (let z = 1; z <= trunkHeight; z++) {
+            chunk.setBlock(x, y, groundHeight + z, BLOCKS.WOOD);
+        }
+
+        // Tapered cone shape: wider at the bottom, narrow at top
+        for (let layer = 0; layer < trunkHeight - 1; layer++) {
+            const lz = groundHeight + 2 + layer;
+            const r = Math.max(1, Math.floor((trunkHeight - layer) / 2));
+            for (let lx = -r; lx <= r; lx++) {
+                for (let ly = -r; ly <= r; ly++) {
+                    const dist = Math.abs(lx) + Math.abs(ly);
+                    if (dist > r) continue;
+                    if (lx === 0 && ly === 0) continue;
+                    this.placeLeaf(chunk, x + lx, y + ly, lz);
+                }
+            }
+        }
+        // Top cap
+        this.placeLeaf(chunk, x, y, groundHeight + trunkHeight + 1);
+    }
+
+    generateJungleTree(chunk, x, y, groundHeight) {
+        const trunkHeight = 7 + Math.floor(Math.random() * 5);
+        const canopyRadius = 3;
+
+        // Thick trunk (2x2 base for tall trees)
+        for (let z = 1; z <= trunkHeight; z++) {
+            chunk.setBlock(x, y, groundHeight + z, BLOCKS.WOOD);
+            if (trunkHeight >= 9 && z <= trunkHeight - 3) {
+                if (x + 1 < CONFIG.CHUNK_SIZE) chunk.setBlock(x + 1, y, groundHeight + z, BLOCKS.WOOD);
+            }
+        }
+
+        // Dense sphere canopy
+        for (let lz = trunkHeight - 3; lz <= trunkHeight + 2; lz++) {
+            const r = lz > trunkHeight ? canopyRadius - 1 : canopyRadius;
+            for (let lx = -r; lx <= r; lx++) {
+                for (let ly = -r; ly <= r; ly++) {
+                    const dist = lx * lx + ly * ly;
+                    if (dist > r * r) continue;
+                    if (lx === 0 && ly === 0 && lz < trunkHeight) continue;
+                    this.placeLeaf(chunk, x + lx, y + ly, groundHeight + lz);
+                }
+            }
+        }
+
+        // Hanging vines below canopy
+        if (BLOCKS.VINES) {
+            const vineSpots = [[-canopyRadius, 0], [canopyRadius, 0], [0, -canopyRadius], [0, canopyRadius]];
+            for (const [vx, vy] of vineSpots) {
+                const px = x + vx;
+                const py = y + vy;
+                if (px < 0 || px >= CONFIG.CHUNK_SIZE || py < 0 || py >= CONFIG.CHUNK_SIZE) continue;
+                const vineLen = 2 + Math.floor(Math.random() * 3);
+                for (let vz = 0; vz < vineLen; vz++) {
+                    const vZpos = groundHeight + trunkHeight - 3 - vz;
+                    if (vZpos > groundHeight && chunk.getBlock(px, py, vZpos) === BLOCKS.AIR) {
+                        chunk.setBlock(px, py, vZpos, BLOCKS.VINES);
                     }
+                }
+            }
+        }
+    }
+
+    generateAcaciaTree(chunk, x, y, groundHeight) {
+        const trunkHeight = 4 + Math.floor(Math.random() * 3);
+
+        // Angled trunk — offset the top
+        const offsetX = Math.random() < 0.5 ? 1 : -1;
+        for (let z = 1; z <= trunkHeight; z++) {
+            const tx = z > trunkHeight / 2 ? x + offsetX : x;
+            if (tx >= 0 && tx < CONFIG.CHUNK_SIZE) {
+                chunk.setBlock(tx, y, groundHeight + z, BLOCKS.WOOD);
+            }
+        }
+
+        // Flat wide canopy (2 layers)
+        const topX = x + offsetX;
+        const flatRadius = 3;
+        for (let dz = 0; dz <= 1; dz++) {
+            const r = dz === 0 ? flatRadius : flatRadius - 1;
+            for (let lx = -r; lx <= r; lx++) {
+                for (let ly = -r; ly <= r; ly++) {
+                    if (Math.abs(lx) === r && Math.abs(ly) === r) continue;
+                    this.placeLeaf(chunk, topX + lx, y + ly, groundHeight + trunkHeight + dz);
                 }
             }
         }
@@ -951,7 +1052,6 @@ export class World {
     }
 
     spawnRelics() {
-        console.log('World: Spawning Primal Relics...');
         this.relicPositions.forEach(relic => {
             // Get height at position
             const h = this.getHeight(relic.x, relic.y);
@@ -960,7 +1060,6 @@ export class World {
             // Spawn as item entity
             this.game.spawnItem(relic.id, 1, relic.x, relic.y, relic.z);
             relic.spawned = true;
-            console.log(`Relic ${relic.id} spawned at ${relic.x}, ${relic.y}, ${relic.z}`);
         });
     }
 }

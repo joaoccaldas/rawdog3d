@@ -128,7 +128,6 @@ export class TutorialSystem {
         this.stepProgress = {};
         this.displayTime = 0;
         
-        console.log('Tutorial started');
     }
     
     // Skip tutorial
@@ -206,7 +205,6 @@ export class TutorialSystem {
         const step = this.getCurrentStep();
         if (!step) return;
         
-        console.log(`Tutorial step completed: ${step.id}`);
         
         // Play completion sound
         this.game.audio?.play('tutorial_complete');
@@ -226,7 +224,6 @@ export class TutorialSystem {
         this.active = false;
         this.completed = true;
         
-        console.log('Tutorial completed!');
         
         // Achievement
         this.game.achievements?.unlock?.('tutorial_complete');

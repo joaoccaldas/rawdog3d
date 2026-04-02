@@ -128,7 +128,6 @@ export class SoundManager {
         try {
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
             this.initialized = true;
-            console.log('Sound Manager initialized');
         } catch (e) {
             console.warn('Failed to initialize audio context:', e);
         }

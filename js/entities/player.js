@@ -414,7 +414,6 @@ export class Player extends Entity {
         const shouldLog = this._debugFrameCount <= 5;
 
         if (shouldLog) {
-            console.log(`Physics[${this._debugFrameCount}]: pos(${this.x.toFixed(2)},${this.y.toFixed(2)},${this.z.toFixed(2)}) vel(${this.vx.toFixed(2)},${this.vy.toFixed(2)},${this.vz.toFixed(2)}) grounded=${this.grounded} dt=${dt.toFixed(4)}`);
         }
 
         // Check if in water
@@ -534,7 +533,6 @@ export class Player extends Entity {
                 this.x = nextX;
                 this.grounded = true;
                 this.vz = 0;
-                console.log('Auto-Step X triggered');
             } else {
                 // Wall collision feedback
                 if (Math.abs(this.vx) > this.speed * 0.5) {
@@ -817,7 +815,6 @@ export class Player extends Entity {
     addItem(itemKey, count = 1) {
         const itemDef = ITEMS[itemKey];
         if (!itemDef) {
-            console.log(`addItem: No item definition for ${itemKey}`);
             return false;
         }
 
@@ -978,7 +975,6 @@ export class Player extends Entity {
         const placeZ = placePosition.z;
         
         // Debug logging for block placement
-        console.log(`Place attempt: hit(${hit.x},${hit.y},${hit.z}) -> place(${bx},${by},${placeZ}) blockAtPlace=${this.game.world.getBlock(bx, by, placeZ)}`);
 
         // Hoe Logic (Till Dirt) - Special Case target EXISTING block
         if (item.type === 'tool' && item.toolType === 'hoe') {

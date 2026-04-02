@@ -8,7 +8,7 @@ export const CONFIG = {
     // World
     CHUNK_SIZE: 16,
     WORLD_HEIGHT: 32,
-    RENDER_DISTANCE: 2,
+    RENDER_DISTANCE: 5,
     SEA_LEVEL: 12,
 
     // Player
@@ -123,7 +123,7 @@ export const BLOCKS = {
     COBBLE_SLAB: 424,
     WALL_COBBLE: 425,
     // New blocks for progression
-    STONE_BRICKS: 40,
+    STONE_BRICKS: 81,
     VINES: 41,
     BED: 42,
     COPPER_ORE: 43,
@@ -1227,7 +1227,7 @@ export const ENEMIES = {
         health: 100,
         damage: 15,
         speed: 1.2,
-        aggressive: false,
+        aggressive: true,
         xp: 100,
         drops: [['raw_meat', 5, 8], ['leather', 3, 5], ['bone', 4, 6]],
     },
@@ -1291,7 +1291,7 @@ export const ENEMIES = {
         health: 90,
         damage: 18,
         speed: 2,
-        aggressive: false,
+        aggressive: true,
         xp: 80,
         drops: [['raw_meat', 5, 7], ['leather', 3, 5], ['bone', 3, 5]],
     },

@@ -39,12 +39,9 @@ export class UIManager {
 
         // Landing page is hidden by default, start screen shows first
 
-        console.log('UIManager: Initializing...');
         const newGameBtn = document.getElementById('btn-new-game');
         if (newGameBtn) {
-            console.log('UIManager: Found New Game Button');
             newGameBtn.addEventListener('click', () => {
-                console.log('UIManager: New Game Clicked');
                 this.startNewGame();
             });
         } else {
@@ -54,9 +51,7 @@ export class UIManager {
         // Builder Mode button
         const builderModeBtn = document.getElementById('btn-builder-mode');
         if (builderModeBtn) {
-            console.log('UIManager: Found Builder Mode Button');
             builderModeBtn.addEventListener('click', () => {
-                console.log('UIManager: Builder Mode Clicked');
                 this.startBuilderMode();
             });
         }
@@ -248,12 +243,10 @@ export class UIManager {
     }
 
     startNewGame() {
-        console.log('UIManager: Starting New Game...');
 
         // Get player name from input
         const playerName = this.playerNameInput?.value.trim() || 'Survivor';
         this.game.playerName = playerName;
-        console.log(`UIManager: Player name set to "${playerName}"`);
 
         // Hide start screen
         this.startScreen.classList.add('hidden');
@@ -266,7 +259,6 @@ export class UIManager {
 
         // Play story animation
         this.landingPage.start(() => {
-            console.log('UIManager: Animation complete, starting walking test...');
             this.game.introCinematic = false;
             this.game.firstSteps = true;
             // The quest manager init is called inside game.startNewGame()
@@ -274,12 +266,10 @@ export class UIManager {
     }
 
     startBuilderMode() {
-        console.log('UIManager: Starting Builder Mode...');
 
         // Get player name from input
         const playerName = this.playerNameInput?.value.trim() || 'Builder';
         this.game.playerName = playerName;
-        console.log(`UIManager: Player name set to "${playerName}"`);
 
         // Hide start screen
         this.startScreen.classList.add('hidden');

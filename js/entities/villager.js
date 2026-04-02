@@ -715,7 +715,6 @@ export class VillageSystem {
     }
 
     init() {
-        console.log('Village System initialized');
     }
 
     update(deltaTime) {
@@ -761,7 +760,6 @@ export class VillageSystem {
         this.spawnInitialVillagers(village);
         
         this.villages.set(key, village);
-        console.log(`Village generated at chunk (${chunkX}, ${chunkY})`);
     }
 
     generateVillageStructures(village) {

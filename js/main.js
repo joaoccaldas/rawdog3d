@@ -316,7 +316,6 @@ class Game {
         const loading = document.getElementById('loading-screen');
         if (loading) loading.style.display = 'none';
 
-        console.log('Game Initialized');
 
         this.paused = true; // Start paused at menu
 
@@ -390,7 +389,6 @@ class Game {
     }
 
     startNewGame() {
-        console.log('Game: startNewGame called. Creating fresh world...');
         this.firstSteps = false; // Will be enabled by UIManager after intro
         this.introCinematic = false;
 
@@ -512,14 +510,12 @@ class Game {
         // Overwrite save immediately to prevent loading old state later
         this.saveManager.save();
 
-        console.log(`Game: New Game Started. Spawn at Z=${this.player.z}`);
         this.player.updateUI();
     }
 
     giveBuilderItems() {
         if (!this.player) return;
         
-        console.log('Game: Giving builder mode items...');
         
         // Builder mode settings - god mode essentially
         this.player.health = 9999;
@@ -569,7 +565,6 @@ class Game {
         }
         
         this.player.updateUI();
-        console.log(`Game: Builder mode - gave ${invIndex} items`);
     }
 
     togglePause(paused) {
@@ -585,7 +580,6 @@ class Game {
             this.ui.togglePauseUI(this.paused);
         }
 
-        console.log(`Game: ${this.paused ? 'Paused' : 'Resumed'}`);
     }
 
     update(deltaTime) {
@@ -808,7 +802,6 @@ class Game {
 
         // Debug Log every 60 frames
         if (Math.floor(Date.now() / 1000) % 2 === 0 && Math.random() < 0.05) {
-            console.log(`Debug: Player(${this.player.x.toFixed(2)}, ${this.player.y.toFixed(2)}, ${this.player.z.toFixed(2)}) Camera(${this.camera.x.toFixed(2)}, ${this.camera.y.toFixed(2)})`);
         }
 
         // Update entities
