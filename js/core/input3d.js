@@ -62,11 +62,6 @@ export class Input3D {
         
         // Mobile detection
         this.detectMobile();
-        
-        if (this.mobileEnabled) {
-            this.initMobileControls();
-        }
-        
     }
     
     detectMobile() {
@@ -79,23 +74,23 @@ export class Input3D {
         }
     }
     
+    activateMobileControls() {
+        if (!this.mobileEnabled) return;
+        this.initMobileControls();
+    }
+
     initMobileControls() {
-        // Virtual joystick for movement
-        const joystickBase = document.getElementById('joystick-base');
-        const joystickStick = document.getElementById('joystick-stick');
+        // Joystick is handled by main3d.js setupJoystick() which writes
+        // directly to this.joystick — no duplicate setup needed here.
 
-        if (joystickBase && joystickStick) {
-            this.setupJoystick(joystickBase, joystickStick);
-        }
-
-        // Jump button
-        this.setupMobileButton('mobile-jump-btn',
+        // Jump
+        this.setupMobileButton('btn-mobile-jump',
             () => this.actions.jump = true,
             () => this.actions.jump = false
         );
 
-        // Attack button (simulate left click / mine)
-        this.setupMobileButton('mobile-attack-btn',
+        // Mine / attack
+        this.setupMobileButton('btn-mobile-mine',
             () => {
                 this.mouse.leftDown = true;
                 this.actions.mine = true;
@@ -108,8 +103,8 @@ export class Input3D {
             }
         );
 
-        // Place button (simulate right click / use)
-        this.setupMobileButton('mobile-place-btn',
+        // Place / use
+        this.setupMobileButton('btn-mobile-place',
             () => {
                 this.mouse.rightDown = true;
                 this.actions.use = true;
@@ -120,8 +115,32 @@ export class Input3D {
             }
         );
 
-        // Hotbar slot cycling
-        this.setupMobileButton('mobile-prev-slot',
+        // Inventory
+        this.setupMobileButton('btn-mobile-inventory',
+            () => this.game.ui?.toggleInventory(),
+            () => {}
+        );
+
+        // Menu
+        this.setupMobileButton('btn-mobile-menu',
+            () => {
+                const pauseMenu = document.getElementById('pause-menu');
+                if (pauseMenu) {
+                    if (pauseMenu.classList.contains('hidden')) {
+                        pauseMenu.classList.remove('hidden');
+                        this.game.paused = true;
+                        this.game.updatePauseMenuQuests?.();
+                    } else {
+                        pauseMenu.classList.add('hidden');
+                        this.game.paused = false;
+                    }
+                }
+            },
+            () => {}
+        );
+
+        // Hotbar cycling
+        this.setupMobileButton('btn-mobile-prev',
             () => {
                 const player = this.game.player;
                 if (player) {
@@ -132,7 +151,7 @@ export class Input3D {
             () => {}
         );
 
-        this.setupMobileButton('mobile-next-slot',
+        this.setupMobileButton('btn-mobile-next',
             () => {
                 const player = this.game.player;
                 if (player) {
@@ -142,79 +161,6 @@ export class Input3D {
             },
             () => {}
         );
-
-        // Inventory toggle
-        this.setupMobileButton('mobile-inventory-btn',
-            () => this.game.ui?.toggleInventory(),
-            () => {}
-        );
-
-        // Menu / pause toggle
-        this.setupMobileButton('mobile-menu-btn',
-            () => {
-                this.game.menuRequested = true;
-                if (document.pointerLockElement) {
-                    document.exitPointerLock();
-                }
-                this.game.togglePause?.();
-            },
-            () => {}
-        );
-
-        // Touch-to-look camera controls
-        this.setupTouchLook();
-    }
-    
-    setupJoystick(base, stick) {
-        let origin = { x: 0, y: 0 };
-        const maxDist = 40;
-        
-        const onStart = (e) => {
-            e.preventDefault();
-            const touch = e.touches ? e.touches[0] : e;
-            const rect = base.getBoundingClientRect();
-            origin = {
-                x: rect.left + rect.width / 2,
-                y: rect.top + rect.height / 2
-            };
-            this.joystick.active = true;
-            base.classList.add('active');
-        };
-        
-        const onMove = (e) => {
-            if (!this.joystick.active) return;
-            e.preventDefault();
-            
-            const touch = e.touches ? e.touches[0] : e;
-            let dx = touch.clientX - origin.x;
-            let dy = touch.clientY - origin.y;
-            
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist > maxDist) {
-                dx = (dx / dist) * maxDist;
-                dy = (dy / dist) * maxDist;
-            }
-            
-            stick.style.transform = `translate(${dx}px, ${dy}px)`;
-            
-            this.joystick.x = dx / maxDist;
-            this.joystick.y = dy / maxDist;
-        };
-        
-        const onEnd = () => {
-            this.joystick.active = false;
-            this.joystick.x = 0;
-            this.joystick.y = 0;
-            stick.style.transform = 'translate(0, 0)';
-            base.classList.remove('active');
-        };
-        
-        base.addEventListener('touchstart', onStart, { passive: false });
-        base.addEventListener('mousedown', onStart);
-        window.addEventListener('touchmove', onMove, { passive: false });
-        window.addEventListener('mousemove', onMove);
-        window.addEventListener('touchend', onEnd);
-        window.addEventListener('mouseup', onEnd);
     }
     
     setupMobileButton(id, onDown, onUp) {
@@ -253,53 +199,6 @@ export class Input3D {
         });
     }
     
-    setupTouchLook() {
-        const canvas = document.getElementById('game-canvas-3d') || document.querySelector('canvas');
-        if (!canvas) return;
-
-        let lastTouchX = 0;
-        let lastTouchY = 0;
-        let lookTouchId = null;
-        const lookSensitivity = 0.3;
-
-        canvas.addEventListener('touchstart', (e) => {
-            for (const touch of e.changedTouches) {
-                if (touch.clientX > window.innerWidth * 0.4 && lookTouchId === null) {
-                    lookTouchId = touch.identifier;
-                    lastTouchX = touch.clientX;
-                    lastTouchY = touch.clientY;
-                }
-            }
-        }, { passive: true });
-
-        canvas.addEventListener('touchmove', (e) => {
-            for (const touch of e.changedTouches) {
-                if (touch.identifier === lookTouchId) {
-                    const dx = touch.clientX - lastTouchX;
-                    const dy = touch.clientY - lastTouchY;
-
-                    const cam = this.game.camera3d;
-                    if (cam) {
-                        cam.yaw -= dx * lookSensitivity * cam.sensitivity;
-                        cam.pitch -= dy * lookSensitivity * cam.sensitivity;
-                        cam.pitch = Math.max(cam.minPitch, Math.min(cam.maxPitch, cam.pitch));
-                    }
-
-                    lastTouchX = touch.clientX;
-                    lastTouchY = touch.clientY;
-                }
-            }
-        }, { passive: true });
-
-        canvas.addEventListener('touchend', (e) => {
-            for (const touch of e.changedTouches) {
-                if (touch.identifier === lookTouchId) {
-                    lookTouchId = null;
-                }
-            }
-        }, { passive: true });
-    }
-
     onKeyDown(e) {
         this.keys[e.code] = true;
 

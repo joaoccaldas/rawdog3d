@@ -302,35 +302,6 @@
         <!-- Three.js will add canvas here -->
     </div>
 
-    <!-- Mobile Controls -->
-    <div id="mobile-controls" style="display:none;">
-        <!-- Left side: Joystick -->
-        <div id="joystick-base" style="position:fixed; bottom:80px; left:40px; width:120px; height:120px; border-radius:50%; background:rgba(255,255,255,0.15); border:2px solid rgba(255,255,255,0.3); touch-action:none; z-index:200;">
-            <div id="joystick-stick" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:50px; height:50px; border-radius:50%; background:rgba(255,255,255,0.4); pointer-events:none;"></div>
-        </div>
-
-        <!-- Right side: Action buttons -->
-        <div style="position:fixed; bottom:60px; right:20px; display:flex; flex-direction:column; gap:10px; z-index:200;">
-            <button id="mobile-jump-btn" style="width:60px; height:60px; border-radius:50%; background:rgba(255,255,255,0.2); border:2px solid rgba(255,255,255,0.4); color:white; font-size:24px; touch-action:none;">&#x2B06;</button>
-            <div style="display:flex; gap:10px;">
-                <button id="mobile-attack-btn" style="width:60px; height:60px; border-radius:50%; background:rgba(255,50,50,0.3); border:2px solid rgba(255,100,100,0.5); color:white; font-size:24px; touch-action:none;">&#x2694;</button>
-                <button id="mobile-place-btn" style="width:60px; height:60px; border-radius:50%; background:rgba(50,150,255,0.3); border:2px solid rgba(100,180,255,0.5); color:white; font-size:24px; touch-action:none;">&#x1F9F1;</button>
-            </div>
-        </div>
-
-        <!-- Bottom: Hotbar scroll arrows -->
-        <div style="position:fixed; bottom:10px; left:50%; transform:translateX(-50%); display:flex; gap:8px; z-index:200;">
-            <button id="mobile-prev-slot" style="width:40px; height:40px; border-radius:8px; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:white; font-size:18px; touch-action:none;">&#x25C0;</button>
-            <button id="mobile-next-slot" style="width:40px; height:40px; border-radius:8px; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:white; font-size:18px; touch-action:none;">&#x25B6;</button>
-        </div>
-
-        <!-- Inventory and menu buttons -->
-        <div style="position:fixed; top:10px; right:10px; display:flex; gap:8px; z-index:200;">
-            <button id="mobile-inventory-btn" style="width:44px; height:44px; border-radius:8px; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:white; font-size:20px; touch-action:none;">&#x1F392;</button>
-            <button id="mobile-menu-btn" style="width:44px; height:44px; border-radius:8px; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:white; font-size:20px; touch-action:none;">&#x2630;</button>
-        </div>
-    </div>
-    
     <!-- Crosshair -->
     <div class="crosshair"></div>
     

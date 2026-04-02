@@ -215,7 +215,7 @@ class Game3D {
         // Mobile doesn't use pointer lock
         if (this.isMobile) {
             this.setupMobileControls();
-            // Hide pointer lock prompt on mobile
+            if (this.input) this.input.activateMobileControls();
             if (prompt) prompt.style.display = 'none';
             this.paused = false;
             return;
@@ -409,6 +409,10 @@ class Game3D {
                 <button id="btn-mobile-craft" class="mobile-btn" title="Craft">🔥</button>
                 <button id="btn-mobile-menu" class="mobile-btn" title="Menu">🦴</button>
             </div>
+            <div id="mobile-hotbar-nav">
+                <button id="btn-mobile-prev" class="mobile-btn mobile-btn-small" title="Prev">◀</button>
+                <button id="btn-mobile-next" class="mobile-btn mobile-btn-small" title="Next">▶</button>
+            </div>
         `;
         document.body.appendChild(mobileUI);
         
@@ -485,6 +489,26 @@ class Game3D {
             .mobile-btn:active, .mobile-btn.active {
                 background: linear-gradient(145deg, rgba(255,165,0,0.8), rgba(139,69,19,0.9));
                 transform: scale(0.95);
+            }
+            .mobile-btn-small {
+                width: 40px;
+                height: 40px;
+                font-size: 16px;
+                border-radius: 8px;
+            }
+            #mobile-hotbar-nav {
+                position: absolute;
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                display: flex;
+                gap: 8px;
+                pointer-events: auto;
+            }
+            #game-container {
+                -webkit-user-select: none;
+                user-select: none;
+                -webkit-touch-callout: none;
             }
             @media (max-width: 1024px) {
                 .crosshair { display: none !important; }
