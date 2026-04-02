@@ -729,15 +729,15 @@ export class World {
                     }
                 }
 
-                // Pass 3: Cave carving with dual-noise
-                for (let z = 2; z < height - 2; z++) {
+                // Pass 3: Cave carving with dual-noise (deep only, not near surface)
+                for (let z = 3; z < height - 5; z++) {
                     const currentBlock = chunk.getBlock(x, y, z);
                     if (currentBlock === BLOCKS.AIR || currentBlock === BLOCKS.BEDROCK) continue;
 
                     const cv1 = this.caveNoise.perlin3(wx * 0.05, wy * 0.05, z * 0.08);
                     const cv2 = this.caveNoise2.perlin3(wx * 0.03, wy * 0.03, z * 0.05);
 
-                    if ((cv1 * cv2) > 0.02) {
+                    if ((cv1 * cv2) > 0.06) {
                         chunk.setBlock(x, y, z, BLOCKS.AIR);
                     }
                 }
@@ -983,7 +983,7 @@ export class World {
         const actualLy = ly < 0 ? ly + CONFIG.CHUNK_SIZE : ly;
 
         const chunk = this.getChunk(cx, cy);
-        return chunk ? chunk.getBlock(actualLx, actualLy, z) : BLOCKS.AIR;
+        return chunk ? chunk.getBlock(actualLx, actualLy, z) : BLOCKS.STONE;
     }
 
     setBlock(x, y, z, blockId) {

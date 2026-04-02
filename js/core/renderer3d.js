@@ -228,10 +228,9 @@ export class Renderer3D {
     }
     
     buildTextureAtlas() {
-        // Create a texture atlas from all block textures
-        // Atlas layout: 16x16 tiles, each tile is 16x16 pixels
-        const tileSize = 16;
-        const atlasSize = 256; // 16x16 grid of tiles
+        const tileSize = this.textureManager.tileSize;
+        const tilesPerRow = 16;
+        const atlasSize = tilesPerRow * tileSize;
         
         const canvas = document.createElement('canvas');
         canvas.width = atlasSize;
@@ -255,8 +254,8 @@ export class Renderer3D {
                 this.atlasMap.set(blockId, {});
             }
             
-            const tileX = (atlasIndex % 16) * tileSize;
-            const tileY = Math.floor(atlasIndex / 16) * tileSize;
+            const tileX = (atlasIndex % tilesPerRow) * tileSize;
+            const tileY = Math.floor(atlasIndex / tilesPerRow) * tileSize;
             
             // Get the canvas from the texture - use sourceCanvas we stored, or image
             const sourceImage = texture.sourceCanvas || texture.image;
@@ -1330,15 +1329,15 @@ export class Renderer3D {
             geometry.setIndex(indices);
             geometry.computeBoundingSphere();
             
-            // Use atlas material with textures
+            // Use atlas material with vertex colors for AO and face shading
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
             let material;
             if (this.atlasTexture) {
                 material = new THREE.MeshLambertMaterial({
-                    map: this.atlasTexture
+                    map: this.atlasTexture,
+                    vertexColors: true
                 });
             } else {
-                // Fallback: use vertex colors
-                geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
                 material = new THREE.MeshLambertMaterial({
                     vertexColors: true
                 });
@@ -1389,25 +1388,27 @@ export class Renderer3D {
     }
     
     shouldRenderFace(chunk, lx, ly, lz, currentBlock) {
-        // Check if face should be rendered (adjacent is air or out of bounds)
-        if (lz < 0 || lz >= CONFIG.WORLD_HEIGHT) return true;
-        
+        if (lz < 0 || lz >= CONFIG.WORLD_HEIGHT) return lz >= CONFIG.WORLD_HEIGHT;
+
         let adjBlock;
-        
-        // If out of chunk bounds, check world
-        if (lx < 0 || lx >= CONFIG.CHUNK_SIZE || 
+
+        if (lx < 0 || lx >= CONFIG.CHUNK_SIZE ||
             ly < 0 || ly >= CONFIG.CHUNK_SIZE) {
-            // Get from world
             const wx = chunk.x * CONFIG.CHUNK_SIZE + lx;
             const wy = chunk.y * CONFIG.CHUNK_SIZE + ly;
+            const ncx = Math.floor(wx / CONFIG.CHUNK_SIZE);
+            const ncy = Math.floor(wy / CONFIG.CHUNK_SIZE);
+            const neighborChunk = this.game.world.getChunk(ncx, ncy);
+            if (!neighborChunk) {
+                return false;
+            }
             adjBlock = this.game.world.getBlock(wx, wy, lz);
         } else {
             adjBlock = chunk.getBlock(lx, ly, lz);
         }
-        
-        // Don't render face between same block types (especially water)
+
         if (adjBlock === currentBlock) return false;
-        
+
         return adjBlock === BLOCKS.AIR || BLOCK_DATA[adjBlock]?.transparent;
     }
     

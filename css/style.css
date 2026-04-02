@@ -2027,5 +2027,44 @@ body {
     #crafting-menu .crafting-container {
         width: 90vw !important;
         max-width: 360px !important;
+        max-height: 70vh !important;
+        overflow-y: auto !important;
+    }
+
+    .recipe-grid {
+        grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)) !important;
+        gap: 4px !important;
+    }
+
+    /* Pause menu touch-friendly buttons */
+    #pause-menu button,
+    #pause-menu .menu-btn {
+        font-size: 14px !important;
+        padding: 10px !important;
+        min-height: 44px !important;
+        touch-action: manipulation !important;
+    }
+
+    /* Death screen adjustments */
+    #death-screen h1,
+    #death-screen .death-title {
+        font-size: 28px !important;
+    }
+
+    #death-screen button {
+        min-height: 44px !important;
+        font-size: 14px !important;
+        touch-action: manipulation !important;
+    }
+
+    /* Hide the STONE AGE 3D title badge */
+    #mode-indicator {
+        display: none !important;
+    }
+
+    /* Ensure all interactive targets are tap-friendly */
+    button, .btn, [role="button"] {
+        min-height: 44px;
+        min-width: 44px;
     }
 }

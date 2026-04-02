@@ -11,7 +11,7 @@ export class TextureManager3D {
         this.textures = new Map();
         this.materials = new Map();
         this.textureLoader = new THREE.TextureLoader();
-        this.tileSize = 16;
+        this.tileSize = 32;
         this.atlasLoaded = false;
         this.atlasTexture = null;
         
@@ -334,6 +334,15 @@ export class TextureManager3D {
         }
     }
 
+    parseColor(hex) {
+        const h = hex.replace('#', '');
+        return {
+            r: parseInt(h.substring(0, 2), 16),
+            g: parseInt(h.substring(2, 4), 16),
+            b: parseInt(h.substring(4, 6), 16)
+        };
+    }
+
     seededRandom(seed) {
         let s = seed;
         return () => {
@@ -344,142 +353,192 @@ export class TextureManager3D {
 
     addStoneNoise(ctx, baseColor, random) {
         const size = this.tileSize;
-        for (let i = 0; i < 30; i++) {
-            const x = Math.floor(random() * size);
-            const y = Math.floor(random() * size);
-            const shade = random() > 0.5 ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.1)';
-            ctx.fillStyle = shade;
-            ctx.fillRect(x, y, 1 + Math.floor(random() * 2), 1 + Math.floor(random() * 2));
+        const rgb = this.parseColor(baseColor);
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                const variation = Math.floor(random() * 30) - 15;
+                const r = Math.max(0, Math.min(255, rgb.r + variation));
+                const g = Math.max(0, Math.min(255, rgb.g + variation));
+                const b = Math.max(0, Math.min(255, rgb.b + variation));
+                ctx.fillStyle = `rgb(${r},${g},${b})`;
+                ctx.fillRect(x, y, 1, 1);
+            }
+        }
+        for (let i = 0; i < 4; i++) {
+            const sx = Math.floor(random() * (size - 6));
+            const sy = Math.floor(random() * (size - 2));
+            const len = 3 + Math.floor(random() * 5);
+            ctx.fillStyle = 'rgba(0,0,0,0.18)';
+            ctx.fillRect(sx, sy, len, 1);
+            if (random() > 0.5) ctx.fillRect(sx + len - 1, sy + 1, 1, 1 + Math.floor(random() * 2));
         }
     }
 
     addDirtNoise(ctx, baseColor, random) {
         const size = this.tileSize;
-        for (let i = 0; i < 20; i++) {
-            const x = Math.floor(random() * size);
-            const y = Math.floor(random() * size);
-            const shade = random() > 0.5 ? 'rgba(0,0,0,0.15)' : 'rgba(139,69,19,0.3)';
-            ctx.fillStyle = shade;
-            ctx.fillRect(x, y, 1, 1);
+        const rgb = this.parseColor(baseColor);
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                const v = Math.floor(random() * 24) - 12;
+                const r = Math.max(0, Math.min(255, rgb.r + v));
+                const g = Math.max(0, Math.min(255, rgb.g + v));
+                const b = Math.max(0, Math.min(255, rgb.b + v));
+                ctx.fillStyle = `rgb(${r},${g},${b})`;
+                ctx.fillRect(x, y, 1, 1);
+            }
+        }
+        for (let i = 0; i < Math.floor(size * 0.8); i++) {
+            const px = Math.floor(random() * size);
+            const py = Math.floor(random() * size);
+            const s = 1 + Math.floor(random() * 2);
+            ctx.fillStyle = random() > 0.6 ? 'rgba(60,30,10,0.35)' : 'rgba(120,80,40,0.25)';
+            ctx.fillRect(px, py, s, s);
         }
     }
 
     addGrassTop(ctx, random) {
         const size = this.tileSize;
-        // Base green
-        ctx.fillStyle = '#4CAF50';
-        ctx.fillRect(0, 0, size, size);
-        
-        // Add grass blade variations
-        for (let i = 0; i < 40; i++) {
-            const x = Math.floor(random() * size);
-            const y = Math.floor(random() * size);
-            const shade = random() > 0.5 ? '#3D8B40' : '#5DBF60';
-            ctx.fillStyle = shade;
-            ctx.fillRect(x, y, 1, 1);
+        const greens = ['#3D8B40', '#4CAF50', '#5DBF60', '#3E9B3E', '#46A046', '#55B855'];
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                ctx.fillStyle = greens[Math.floor(random() * greens.length)];
+                ctx.fillRect(x, y, 1, 1);
+            }
+        }
+        for (let i = 0; i < Math.floor(size * 0.5); i++) {
+            const bx = Math.floor(random() * size);
+            const by = Math.floor(random() * size);
+            ctx.fillStyle = random() > 0.5 ? '#2D7B30' : '#6DCF70';
+            ctx.fillRect(bx, by, 1, 1 + Math.floor(random() * 2));
         }
     }
 
     addGrassSide(ctx, colors, random) {
         const size = this.tileSize;
-        // Top 3 pixels are grass
-        ctx.fillStyle = '#4CAF50';
-        ctx.fillRect(0, 0, size, 3);
-        
-        // Rest is dirt
-        ctx.fillStyle = colors.side || '#8B5A2B';
-        ctx.fillRect(0, 3, size, size - 3);
-        
-        // Add dirt texture
-        for (let i = 0; i < 15; i++) {
-            const x = Math.floor(random() * size);
-            const y = 3 + Math.floor(random() * (size - 3));
-            ctx.fillStyle = 'rgba(0,0,0,0.15)';
-            ctx.fillRect(x, y, 1, 1);
+        const grassRows = Math.max(3, Math.floor(size * 0.2));
+        const greens = ['#3D8B40', '#4CAF50', '#5DBF60', '#46A046'];
+        for (let y = 0; y < grassRows; y++) {
+            for (let x = 0; x < size; x++) {
+                ctx.fillStyle = greens[Math.floor(random() * greens.length)];
+                ctx.fillRect(x, y, 1, 1);
+            }
         }
-        
-        // Grass hanging down
+        const dirtColor = colors.side || '#8B5A2B';
+        const dirtRgb = this.parseColor(dirtColor);
+        for (let y = grassRows; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                const v = Math.floor(random() * 20) - 10;
+                const r = Math.max(0, Math.min(255, dirtRgb.r + v));
+                const g = Math.max(0, Math.min(255, dirtRgb.g + v));
+                const b = Math.max(0, Math.min(255, dirtRgb.b + v));
+                ctx.fillStyle = `rgb(${r},${g},${b})`;
+                ctx.fillRect(x, y, 1, 1);
+            }
+        }
         for (let x = 0; x < size; x++) {
-            if (random() > 0.6) {
-                const len = 1 + Math.floor(random() * 2);
-                ctx.fillStyle = '#4CAF50';
-                ctx.fillRect(x, 3, 1, len);
+            if (random() > 0.4) {
+                const len = 1 + Math.floor(random() * Math.floor(size * 0.15));
+                ctx.fillStyle = greens[Math.floor(random() * greens.length)];
+                ctx.fillRect(x, grassRows, 1, len);
             }
         }
     }
 
     addSandNoise(ctx, baseColor, random) {
         const size = this.tileSize;
-        for (let i = 0; i < 25; i++) {
-            const x = Math.floor(random() * size);
-            const y = Math.floor(random() * size);
-            const shade = random() > 0.5 ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.15)';
-            ctx.fillStyle = shade;
-            ctx.fillRect(x, y, 1, 1);
+        const rgb = this.parseColor(baseColor);
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                const v = Math.floor(random() * 18) - 9;
+                const r = Math.max(0, Math.min(255, rgb.r + v));
+                const g = Math.max(0, Math.min(255, rgb.g + v));
+                const b = Math.max(0, Math.min(255, rgb.b + v));
+                ctx.fillStyle = `rgb(${r},${g},${b})`;
+                ctx.fillRect(x, y, 1, 1);
+            }
         }
     }
 
     addWoodRings(ctx, baseColor, random) {
         const size = this.tileSize;
-        const cx = size / 2;
-        const cy = size / 2;
-        
-        // Draw rings
-        for (let r = 2; r < size / 2; r += 2) {
-            ctx.strokeStyle = random() > 0.5 ? 'rgba(0,0,0,0.2)' : 'rgba(139,69,19,0.3)';
+        const rgb = this.parseColor(baseColor);
+        const lighter = { r: Math.min(255, rgb.r + 25), g: Math.min(255, rgb.g + 20), b: Math.min(255, rgb.b + 10) };
+        ctx.fillStyle = `rgb(${lighter.r},${lighter.g},${lighter.b})`;
+        ctx.fillRect(0, 0, size, size);
+        const cx = size / 2 + Math.floor(random() * 3) - 1;
+        const cy = size / 2 + Math.floor(random() * 3) - 1;
+        for (let r = 2; r < size / 2; r += 2 + Math.floor(random() * 2)) {
+            ctx.strokeStyle = `rgba(${Math.max(0,rgb.r-30)},${Math.max(0,rgb.g-20)},${Math.max(0,rgb.b-10)},${0.25 + random() * 0.15})`;
+            ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.arc(cx, cy, r, 0, Math.PI * 2);
             ctx.stroke();
         }
+        ctx.fillStyle = `rgb(${Math.max(0,rgb.r-20)},${Math.max(0,rgb.g-15)},${Math.max(0,rgb.b-10)})`;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 1, 0, Math.PI * 2);
+        ctx.fill();
     }
 
     addWoodBark(ctx, baseColor, random) {
         const size = this.tileSize;
-        // Vertical lines for bark
-        for (let x = 0; x < size; x += 2 + Math.floor(random() * 2)) {
-            ctx.fillStyle = 'rgba(0,0,0,0.2)';
-            ctx.fillRect(x, 0, 1, size);
+        const rgb = this.parseColor(baseColor);
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                const v = Math.floor(random() * 20) - 10;
+                const r = Math.max(0, Math.min(255, rgb.r + v));
+                const g = Math.max(0, Math.min(255, rgb.g + v));
+                const b = Math.max(0, Math.min(255, rgb.b + v));
+                ctx.fillStyle = `rgb(${r},${g},${b})`;
+                ctx.fillRect(x, y, 1, 1);
+            }
         }
-        
-        // Add some horizontal cracks
-        for (let i = 0; i < 3; i++) {
-            const y = Math.floor(random() * size);
-            const x = Math.floor(random() * size / 2);
-            const len = 2 + Math.floor(random() * 4);
-            ctx.fillStyle = 'rgba(0,0,0,0.15)';
-            ctx.fillRect(x, y, len, 1);
+        let bx = 0;
+        while (bx < size) {
+            const w = 1 + Math.floor(random() * 2);
+            const gap = 2 + Math.floor(random() * 3);
+            ctx.fillStyle = `rgba(0,0,0,${0.15 + random() * 0.12})`;
+            ctx.fillRect(bx, 0, w, size);
+            bx += w + gap;
+        }
+        for (let i = 0; i < Math.floor(size * 0.2); i++) {
+            const cy = Math.floor(random() * size);
+            const cx = Math.floor(random() * size);
+            const len = 2 + Math.floor(random() * Math.floor(size * 0.25));
+            ctx.fillStyle = 'rgba(0,0,0,0.12)';
+            ctx.fillRect(cx, cy, len, 1);
         }
     }
 
     addLeavesPattern(ctx, baseColor, random) {
         const size = this.tileSize;
-        // Create leafy pattern
-        for (let i = 0; i < 50; i++) {
-            const x = Math.floor(random() * size);
-            const y = Math.floor(random() * size);
-            const shade = random() > 0.6 ? '#1E7B1E' : (random() > 0.3 ? '#2E8B2E' : '#3E9B3E');
-            ctx.fillStyle = shade;
-            ctx.fillRect(x, y, 1 + Math.floor(random() * 2), 1 + Math.floor(random() * 2));
+        const leafGreens = ['#1E7B1E', '#228B22', '#2E8B2E', '#3E9B3E', '#1A6B1A', '#2A8A2A'];
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                ctx.fillStyle = leafGreens[Math.floor(random() * leafGreens.length)];
+                ctx.fillRect(x, y, 1, 1);
+            }
         }
-        
-        // Add some gaps (alpha)
+        for (let i = 0; i < Math.floor(size * 1.5); i++) {
+            const lx = Math.floor(random() * size);
+            const ly = Math.floor(random() * size);
+            const ls = 1 + Math.floor(random() * 3);
+            ctx.fillStyle = random() > 0.5 ? '#165B16' : '#4EAB4E';
+            ctx.fillRect(lx, ly, ls, ls);
+        }
         ctx.globalCompositeOperation = 'destination-out';
-        for (let i = 0; i < 10; i++) {
-            const x = Math.floor(random() * size);
-            const y = Math.floor(random() * size);
-            ctx.fillStyle = 'rgba(0,0,0,0.5)';
-            ctx.fillRect(x, y, 1, 1);
+        for (let i = 0; i < Math.floor(size * 0.6); i++) {
+            const gx = Math.floor(random() * size);
+            const gy = Math.floor(random() * size);
+            ctx.fillStyle = `rgba(0,0,0,${0.3 + random() * 0.4})`;
+            ctx.fillRect(gx, gy, 1, 1);
         }
         ctx.globalCompositeOperation = 'source-over';
     }
 
     addOrePattern(ctx, blockId, baseColor, random, colors) {
         const size = this.tileSize;
-        
-        // Add stone texture first
         this.addStoneNoise(ctx, baseColor, random);
-        
-        // Get ore color from blockColors if available, otherwise use defaults
         let oreColor = colors?.oreColor;
         if (!oreColor) {
             const oreColors = {
@@ -492,106 +551,175 @@ export class TextureManager3D {
             };
             oreColor = oreColors[blockId] || '#FF00FF';
         }
-        
-        // Add ore spots
-        const spots = 3 + Math.floor(random() * 4);
-        for (let i = 0; i < spots; i++) {
-            const x = 2 + Math.floor(random() * (size - 4));
-            const y = 2 + Math.floor(random() * (size - 4));
-            ctx.fillStyle = oreColor;
-            ctx.fillRect(x, y, 2, 2);
-            // Add sparkle
-            ctx.fillStyle = 'rgba(255,255,255,0.5)';
-            ctx.fillRect(x, y, 1, 1);
+        const oreRgb = this.parseColor(oreColor);
+        const clusterCount = 2 + Math.floor(random() * 3);
+        for (let c = 0; c < clusterCount; c++) {
+            const cx = 3 + Math.floor(random() * (size - 6));
+            const cy = 3 + Math.floor(random() * (size - 6));
+            const pxCount = 3 + Math.floor(random() * 4);
+            for (let p = 0; p < pxCount; p++) {
+                const ox = cx + Math.floor(random() * 4) - 1;
+                const oy = cy + Math.floor(random() * 4) - 1;
+                if (ox >= 0 && ox < size && oy >= 0 && oy < size) {
+                    const v = Math.floor(random() * 20) - 10;
+                    const r = Math.max(0, Math.min(255, oreRgb.r + v));
+                    const g = Math.max(0, Math.min(255, oreRgb.g + v));
+                    const b = Math.max(0, Math.min(255, oreRgb.b + v));
+                    ctx.fillStyle = `rgb(${r},${g},${b})`;
+                    ctx.fillRect(ox, oy, 2, 2);
+                    if (random() > 0.6) {
+                        ctx.fillStyle = 'rgba(255,255,255,0.45)';
+                        ctx.fillRect(ox, oy, 1, 1);
+                    }
+                }
+            }
         }
     }
 
     addPlanksPattern(ctx, baseColor, random) {
         const size = this.tileSize;
-        const plankWidth = size / 2;
-        
-        // Draw plank divisions
-        ctx.fillStyle = 'rgba(0,0,0,0.3)';
-        ctx.fillRect(plankWidth - 1, 0, 1, size);
-        ctx.fillRect(0, size / 2, size, 1);
-        
-        // Add wood grain
-        for (let i = 0; i < 15; i++) {
-            const x = Math.floor(random() * size);
-            const y = Math.floor(random() * size);
-            ctx.fillStyle = 'rgba(0,0,0,0.1)';
-            ctx.fillRect(x, y, 1 + Math.floor(random() * 3), 1);
+        const rgb = this.parseColor(baseColor);
+        const plankH = Math.floor(size / 4);
+        for (let py = 0; py < 4; py++) {
+            const pv = Math.floor(random() * 16) - 8;
+            const pr = Math.max(0, Math.min(255, rgb.r + pv));
+            const pg = Math.max(0, Math.min(255, rgb.g + pv));
+            const pb = Math.max(0, Math.min(255, rgb.b + pv));
+            for (let y = py * plankH; y < (py + 1) * plankH; y++) {
+                for (let x = 0; x < size; x++) {
+                    const gv = Math.floor(random() * 10) - 5;
+                    ctx.fillStyle = `rgb(${Math.max(0,Math.min(255,pr+gv))},${Math.max(0,Math.min(255,pg+gv))},${Math.max(0,Math.min(255,pb+gv))})`;
+                    ctx.fillRect(x, y, 1, 1);
+                }
+            }
+            ctx.fillStyle = 'rgba(0,0,0,0.25)';
+            ctx.fillRect(0, (py + 1) * plankH - 1, size, 1);
+        }
+        for (let i = 0; i < Math.floor(size * 0.5); i++) {
+            const gx = Math.floor(random() * size);
+            const gy = Math.floor(random() * size);
+            const glen = 2 + Math.floor(random() * Math.floor(size * 0.2));
+            ctx.fillStyle = 'rgba(0,0,0,0.08)';
+            ctx.fillRect(gx, gy, glen, 1);
         }
     }
 
     addBrickPattern(ctx, baseColor, random) {
         const size = this.tileSize;
-        
-        // Mortar color
-        ctx.fillStyle = '#A0A0A0';
-        
-        // Horizontal mortar lines
-        ctx.fillRect(0, 3, size, 1);
-        ctx.fillRect(0, 7, size, 1);
-        ctx.fillRect(0, 11, size, 1);
-        ctx.fillRect(0, 15, size, 1);
-        
-        // Vertical mortar (offset every other row)
-        ctx.fillRect(7, 0, 1, 4);
-        ctx.fillRect(15, 0, 1, 4);
-        ctx.fillRect(3, 4, 1, 4);
-        ctx.fillRect(11, 4, 1, 4);
-        ctx.fillRect(7, 8, 1, 4);
-        ctx.fillRect(15, 8, 1, 4);
-        ctx.fillRect(3, 12, 1, 4);
-        ctx.fillRect(11, 12, 1, 4);
+        const rgb = this.parseColor(baseColor);
+        const brickH = Math.max(4, Math.floor(size / 4));
+        const brickW = Math.max(6, Math.floor(size / 2));
+        const rows = Math.ceil(size / brickH);
+        for (let row = 0; row < rows; row++) {
+            const offset = (row % 2 === 0) ? 0 : Math.floor(brickW / 2);
+            for (let col = -1; col < Math.ceil(size / brickW) + 1; col++) {
+                const bx = col * brickW + offset;
+                const by = row * brickH;
+                const bv = Math.floor(random() * 20) - 10;
+                const br = Math.max(0, Math.min(255, rgb.r + bv));
+                const bg = Math.max(0, Math.min(255, rgb.g + bv));
+                const bb = Math.max(0, Math.min(255, rgb.b + bv));
+                for (let py = by + 1; py < by + brickH - 1 && py < size; py++) {
+                    for (let px = bx + 1; px < bx + brickW - 1 && px < size; px++) {
+                        if (px < 0) continue;
+                        const nv = Math.floor(random() * 8) - 4;
+                        ctx.fillStyle = `rgb(${Math.max(0,Math.min(255,br+nv))},${Math.max(0,Math.min(255,bg+nv))},${Math.max(0,Math.min(255,bb+nv))})`;
+                        ctx.fillRect(px, py, 1, 1);
+                    }
+                }
+            }
+            ctx.fillStyle = '#959595';
+            ctx.fillRect(0, row * brickH, size, 1);
+        }
+        for (let row = 0; row < rows; row++) {
+            const offset = (row % 2 === 0) ? 0 : Math.floor(brickW / 2);
+            for (let col = 0; col < Math.ceil(size / brickW) + 1; col++) {
+                const vx = col * brickW + offset;
+                if (vx > 0 && vx < size) {
+                    ctx.fillStyle = '#959595';
+                    ctx.fillRect(vx, row * brickH, 1, brickH);
+                }
+            }
+        }
     }
 
     addWaterPattern(ctx, baseColor, random) {
         const size = this.tileSize;
-        // Wave pattern
-        for (let y = 0; y < size; y += 3) {
+        const rgb = this.parseColor(baseColor);
+        for (let y = 0; y < size; y++) {
             for (let x = 0; x < size; x++) {
-                const wave = Math.sin((x + y * 0.5) * 0.5) * 0.5;
-                const shade = wave > 0 ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,50,0.2)';
-                ctx.fillStyle = shade;
+                const wave = Math.sin((x * 0.4 + y * 0.3)) * 12;
+                const r = Math.max(0, Math.min(255, rgb.r + Math.floor(wave)));
+                const g = Math.max(0, Math.min(255, rgb.g + Math.floor(wave * 0.8)));
+                const b = Math.max(0, Math.min(255, rgb.b + Math.floor(wave * 0.5)));
+                ctx.fillStyle = `rgb(${r},${g},${b})`;
                 ctx.fillRect(x, y, 1, 1);
             }
+        }
+        for (let i = 0; i < Math.floor(size * 0.3); i++) {
+            const hx = Math.floor(random() * size);
+            const hy = Math.floor(random() * size);
+            ctx.fillStyle = 'rgba(255,255,255,0.25)';
+            ctx.fillRect(hx, hy, 1 + Math.floor(random() * 2), 1);
         }
     }
 
     addSnowPattern(ctx, baseColor, random) {
         const size = this.tileSize;
-        // Sparkles
-        for (let i = 0; i < 15; i++) {
-            const x = Math.floor(random() * size);
-            const y = Math.floor(random() * size);
-            ctx.fillStyle = 'rgba(200,200,255,0.5)';
-            ctx.fillRect(x, y, 1, 1);
+        const rgb = this.parseColor(baseColor);
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                const v = Math.floor(random() * 12) - 4;
+                const r = Math.max(220, Math.min(255, rgb.r + v));
+                const g = Math.max(220, Math.min(255, rgb.g + v));
+                const b = Math.max(225, Math.min(255, rgb.b + v + 3));
+                ctx.fillStyle = `rgb(${r},${g},${b})`;
+                ctx.fillRect(x, y, 1, 1);
+            }
+        }
+        for (let i = 0; i < Math.floor(size * 0.3); i++) {
+            const sx = Math.floor(random() * size);
+            const sy = Math.floor(random() * size);
+            ctx.fillStyle = 'rgba(200,210,255,0.6)';
+            ctx.fillRect(sx, sy, 1, 1);
         }
     }
 
     addGravelPattern(ctx, baseColor, random) {
         const size = this.tileSize;
-        // Pebbles
-        for (let i = 0; i < 25; i++) {
-            const x = Math.floor(random() * size);
-            const y = Math.floor(random() * size);
-            const shade = random() > 0.5 ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.15)';
-            ctx.fillStyle = shade;
-            const s = 1 + Math.floor(random() * 2);
-            ctx.fillRect(x, y, s, s);
+        const rgb = this.parseColor(baseColor);
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                const v = Math.floor(random() * 30) - 15;
+                const r = Math.max(0, Math.min(255, rgb.r + v));
+                const g = Math.max(0, Math.min(255, rgb.g + v));
+                const b = Math.max(0, Math.min(255, rgb.b + v));
+                ctx.fillStyle = `rgb(${r},${g},${b})`;
+                ctx.fillRect(x, y, 1, 1);
+            }
+        }
+        for (let i = 0; i < Math.floor(size * 0.8); i++) {
+            const px = Math.floor(random() * size);
+            const py = Math.floor(random() * size);
+            const ps = 2 + Math.floor(random() * 3);
+            const gv = Math.floor(random() * 50) - 25;
+            ctx.fillStyle = `rgb(${Math.max(0,Math.min(255,rgb.r+gv))},${Math.max(0,Math.min(255,rgb.g+gv))},${Math.max(0,Math.min(255,rgb.b+gv))})`;
+            ctx.fillRect(px, py, ps, ps);
         }
     }
 
     addGenericNoise(ctx, baseColor, random) {
         const size = this.tileSize;
-        for (let i = 0; i < 15; i++) {
-            const x = Math.floor(random() * size);
-            const y = Math.floor(random() * size);
-            const shade = random() > 0.5 ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.1)';
-            ctx.fillStyle = shade;
-            ctx.fillRect(x, y, 1, 1);
+        const rgb = this.parseColor(baseColor);
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                const v = Math.floor(random() * 16) - 8;
+                const r = Math.max(0, Math.min(255, rgb.r + v));
+                const g = Math.max(0, Math.min(255, rgb.g + v));
+                const b = Math.max(0, Math.min(255, rgb.b + v));
+                ctx.fillStyle = `rgb(${r},${g},${b})`;
+                ctx.fillRect(x, y, 1, 1);
+            }
         }
     }
 
@@ -987,13 +1115,20 @@ export class TextureManager3D {
 
     addBedrockPattern(ctx, random) {
         const size = this.tileSize;
-        // Dark chaotic pattern
-        for (let i = 0; i < 50; i++) {
-            const x = Math.floor(random() * size);
-            const y = Math.floor(random() * size);
-            const shade = Math.floor(random() * 30);
-            ctx.fillStyle = `rgb(${shade},${shade},${shade})`;
-            ctx.fillRect(x, y, 1 + Math.floor(random() * 2), 1 + Math.floor(random() * 2));
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                const shade = Math.floor(random() * 40);
+                ctx.fillStyle = `rgb(${shade},${shade},${shade})`;
+                ctx.fillRect(x, y, 1, 1);
+            }
+        }
+        for (let i = 0; i < Math.floor(size * 1.2); i++) {
+            const px = Math.floor(random() * size);
+            const py = Math.floor(random() * size);
+            const ps = 1 + Math.floor(random() * 3);
+            const sv = Math.floor(random() * 50);
+            ctx.fillStyle = `rgb(${sv},${sv},${sv})`;
+            ctx.fillRect(px, py, ps, ps);
         }
     }
 

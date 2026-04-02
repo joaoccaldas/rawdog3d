@@ -140,7 +140,7 @@ export class UIManager {
         // Check for Coal
         const coalIdx = this.findItem('coal');
         if (coalIdx === -1) {
-            alert('Need Coal!');
+            this.showNotification('Need coal to smelt!', 'warning');
             return;
         }
 
@@ -182,7 +182,7 @@ export class UIManager {
             }
         }
 
-        if (!worked) alert('Nothing to smelt!');
+        if (!worked) this.showNotification('Nothing to smelt!', 'info');
         this.game.player.updateUI();
     }
 
@@ -301,7 +301,7 @@ export class UIManager {
             this.game.saveManager.setSlot('save_' + slot);
             this.startScreen.classList.add('hidden');
             if (!this.game.saveManager.load()) {
-                alert('No save found in Slot ' + slot + '. Starting new game.');
+                this.showNotification('No save found in Slot ' + slot + '. Starting new game.', 'info');
                 this.game.startNewGame();
             } else {
                 this.game.paused = false;

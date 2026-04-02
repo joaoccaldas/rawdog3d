@@ -240,8 +240,10 @@ export class SaveManager {
             this.showNotification('Game Saved (Backup Created)');
         } catch (e) {
             console.error('Save failed', e);
-            if (e.name === 'QuotaExceededError') {
-                this.showNotification('Save failed: Storage full');
+            if (e.name === 'QuotaExceededError' || e.code === 22) {
+                this.showNotification('Save failed: Storage full! Try clearing old saves.');
+            } else {
+                this.showNotification('Save failed!');
             }
         }
     }
@@ -463,7 +465,9 @@ export class SaveManager {
     }
 
     showNotification(msg) {
-        if (this.game.ui && this.game.ui.showMessage) {
+        if (this.game.ui?.showNotification) {
+            this.game.ui.showNotification(msg, 'info');
+        } else if (this.game.ui?.showMessage) {
             this.game.ui.showMessage(msg, 2000);
         }
     }

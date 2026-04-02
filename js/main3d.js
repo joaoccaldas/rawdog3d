@@ -564,6 +564,19 @@ class Game3D {
         this.setupJoystick();
         this.setupLookArea();
         this.setupMobileButtons();
+
+        const hint = document.createElement('div');
+        hint.id = 'mobile-hint';
+        hint.textContent = '\u{1F446} Move with joystick \u2022 Tap \u26CF to mine trees & rocks';
+        hint.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);' +
+            'color:#ffd700;font-size:14px;font-weight:bold;text-align:center;' +
+            'text-shadow:0 1px 4px rgba(0,0,0,0.8);pointer-events:none;z-index:600;' +
+            'padding:8px 16px;background:rgba(30,15,5,0.7);border-radius:8px;' +
+            'border:1px solid rgba(139,69,19,0.5);white-space:nowrap;' +
+            'opacity:1;transition:opacity 1.5s ease;';
+        document.body.appendChild(hint);
+        setTimeout(() => { hint.style.opacity = '0'; }, 13500);
+        setTimeout(() => { if (hint.parentNode) hint.parentNode.removeChild(hint); }, 15000);
     }
     
     setupJoystick() {
